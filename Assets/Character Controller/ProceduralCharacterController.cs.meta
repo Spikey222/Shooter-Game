@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: db9795ac2a5dbe04284504d0a3fbd37a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - torso: {instanceID: 0}
+  - head: {instanceID: 0}
+  - rightArm: {instanceID: 0}
+  - rightForearm: {instanceID: 0}
+  - rightHand: {instanceID: 0}
+  - leftArm: {instanceID: 0}
+  - leftForearm: {instanceID: 0}
+  - leftHand: {instanceID: 0}
+  - rightLeg: {instanceID: 0}
+  - leftLeg: {instanceID: 0}
+  - moveAction: {fileID: 1120369429361536294, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
+  - aimAction: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

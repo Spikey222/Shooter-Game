@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f68fe9ea0bb1db4f9c17888eb52324b, type: 3}
+  m_Name: Blue T-Shirt
+  m_EditorClassIdentifier: Assembly-CSharp::Item
+  itemName: Blue T-Shirt
+  description: Item description
+  icon: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  weight: 1
+  itemType: 3
+  maxStackSize: 1
+  clothingEquipSlot: 2
+  overlaySprite: {fileID: 0}
+  overlayOffset: {x: 0, y: 0}
+  clothingPieces:
+  - part: 2
+    visualMode: 1
+    sprite: {fileID: 8655574689670275102, guid: 8029fc90521b19f45b65a4a92ddbbdde, type: 3}
+    localOffset: {x: 0, y: 0}
+  - part: 3
+    visualMode: 1
+    sprite: {fileID: -8459934209250504430, guid: 7ede5aa54f8340647bc20db5f172c2cf, type: 3}
+    localOffset: {x: 0, y: 0}
+  - part: 4
+    visualMode: 1
+    sprite: {fileID: -8459934209250504430, guid: 7ede5aa54f8340647bc20db5f172c2cf, type: 3}
+    localOffset: {x: 0, y: 0}
+  - part: 5
+    visualMode: 1
+    sprite: {fileID: 7376139143079307745, guid: 17b90b9e0416bbd4a8012db08fc74223, type: 3}
+    localOffset: {x: 0, y: 0}
+  - part: 6
+    visualMode: 1
+    sprite: {fileID: 7376139143079307745, guid: 17b90b9e0416bbd4a8012db08fc74223, type: 3}
+    localOffset: {x: 0, y: 0}

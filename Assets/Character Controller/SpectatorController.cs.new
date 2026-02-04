@@ -1,0 +1,353 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+using System.Collections.Generic;
+
+[RequireComponent(typeof(Rigidbody2D))]
+public class SpectatorController : MonoBehaviour
+{
+    [Header("Movement Settings")]
+    [Tooltip("Movement speed of the spectator camera")]
+    public float moveSpeed = 10f;
+    
+    [Tooltip("Movement acceleration")]
+    public float acceleration = 50f;
+    
+    [Tooltip("Movement deceleration")]
+    public float deceleration = 20f;
+    
+    [Tooltip("Team ID for controlling characters")]
+    public int teamId = 0;
+    
+    [Header("Camera Settings")]
+    [Tooltip("Camera follow speed")]
+    public float cameraFollowSpeed = 10f; // Faster camera follow
+    
+    [Tooltip("Camera transition speed when switching control")]
+    public float cameraTransitionSpeed = 5f;
+    
+    [Tooltip("Enable camera zoom with mouse wheel")]
+    public bool enableCameraZoom = true;
+    
+    [Tooltip("Camera zoom speed")]
+    public float cameraZoomSpeed = 3f; // Faster zoom speed
+    
+    [Tooltip("Minimum camera orthographic size")]
+    public float minZoom = 2f;
+    
+    [Tooltip("Maximum camera orthographic size")]
+    public float maxZoom = 15f; // Higher max zoom for overview
+    
+    [Header("Control Settings")]
+    [Tooltip("Distance threshold for auto-control")]
+    public float controlThreshold = 2f;
+    
+    // Private variables
+    private Rigidbody2D rb;
+    private Camera mainCamera;
+    private Vector2 targetVelocity;
+    private Vector2 currentVelocity;
+    private ProceduralCharacterController controlledCharacter;
+    
+    // Start is called before the first frame update
+    private void Start()
+    {
+        // Get rigidbody component
+        rb = GetComponent<Rigidbody2D>();
+        
+        // Configure rigidbody
+        if (rb != null)
+        {
+            rb.gravityScale = 0f;
+            rb.drag = 0f;
+            rb.angularDrag = 0f;
+            rb.freezeRotation = true;
+        }
+        
+        // Get main camera
+        mainCamera = Camera.main;
+        
+        // Attach camera to spectator if not already attached
+        if (mainCamera != null && mainCamera.transform.parent == null)
+        {
+            mainCamera.transform.SetParent(transform);
+            mainCamera.transform.localPosition = new Vector3(0, 0, -10); // Standard camera distance
+        }
+    }
+    
+    // Update is called once per frame
+    private void Update()
+    {
+        // Handle keyboard input for WASD movement
+        HandleKeyboardInput();
+        
+        // Update camera zoom
+        UpdateCameraZoom();
+        
+        // Handle mouse input for character control
+        HandleMouseInput();
+        
+        // Check for CTRL key to release control
+        CheckControlRelease();
+        
+        // Update controlled character if we have one
+        if (controlledCharacter != null)
+        {
+            // Make sure the controlled character is NOT in spectator mode
+            // This gives the player direct control over the character
+            if (controlledCharacter.spectatorMode)
+            {
+                controlledCharacter.SetSpectatorMode(false);
+            }
+            
+            // Update camera position to follow the controlled character
+            UpdateCameraPosition();
+        }
+    }
+    
+    // Fixed update for physics
+    private void FixedUpdate()
+    {
+        // Only move the spectator if we don't have a controlled character
+        if (controlledCharacter == null)
+        {
+            // Apply movement
+            if (rb != null)
+            {
+                // Smoothly interpolate current velocity towards target velocity
+                currentVelocity = Vector2.Lerp(currentVelocity, targetVelocity, Time.fixedDeltaTime * acceleration);
+                
+                // Apply velocity to rigidbody
+                rb.velocity = currentVelocity;
+            }
+        }
+        else
+        {
+            // Reset spectator velocity when controlling a character
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+            
+            currentVelocity = Vector2.zero;
+            targetVelocity = Vector2.zero;
+        }
+    }
+    
+    // Update camera zoom with mouse wheel
+    private void UpdateCameraZoom()
+    {
+        if (mainCamera != null && enableCameraZoom)
+        {
+            float scrollDelta = Mouse.current.scroll.ReadValue().y;
+            if (scrollDelta != 0)
+            {
+                // Get the camera's orthographic size
+                Camera camera = mainCamera.GetComponent<Camera>();
+                if (camera != null && camera.orthographic)
+                {
+                    // Adjust zoom based on scroll direction
+                    float newSize = camera.orthographicSize - (scrollDelta * cameraZoomSpeed * 0.01f);
+                    
+                    // Clamp to min/max zoom levels
+                    camera.orthographicSize = Mathf.Clamp(newSize, minZoom, maxZoom);
+                }
+            }
+        }
+    }
+    
+    // Handle keyboard input for spectator movement
+    private void HandleKeyboardInput()
+    {
+        // Only handle keyboard input if we don't have a controlled character
+        if (controlledCharacter != null)
+            return;
+            
+        // Get keyboard input
+        float horizontal = 0f;
+        float vertical = 0f;
+        
+        if (Keyboard.current != null)
+        {
+            // WASD movement
+            if (Keyboard.current.wKey.isPressed) vertical += 1f;
+            if (Keyboard.current.sKey.isPressed) vertical -= 1f;
+            if (Keyboard.current.aKey.isPressed) horizontal -= 1f;
+            if (Keyboard.current.dKey.isPressed) horizontal += 1f;
+        }
+        
+        // Normalize input vector to prevent faster diagonal movement
+        Vector2 inputVector = new Vector2(horizontal, vertical);
+        if (inputVector.magnitude > 1f)
+        {
+            inputVector.Normalize();
+        }
+        
+        // Set target velocity
+        targetVelocity = inputVector * moveSpeed;
+        
+        // If no input, decelerate
+        if (inputVector.magnitude == 0f)
+        {
+            currentVelocity = Vector2.Lerp(currentVelocity, Vector2.zero, Time.deltaTime * deceleration);
+        }
+    }
+    
+    // Find and control the nearest character within threshold
+    public void ControlNearestCharacter()
+    {
+        // Find all characters in the scene
+        ProceduralCharacterController[] characters = GameObject.FindObjectsByType<ProceduralCharacterController>(FindObjectsSortMode.None);
+        
+        // Find the nearest character with matching team ID
+        ProceduralCharacterController nearest = null;
+        float nearestDistance = float.MaxValue;
+        
+        foreach (ProceduralCharacterController character in characters)
+        {
+            // Skip characters with different team ID
+            if (character.teamId != teamId)
+                continue;
+                
+            float distance = Vector2.Distance(transform.position, character.transform.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = character;
+            }
+        }
+        
+        if (nearest != null && nearestDistance <= controlThreshold)
+        {
+            SwitchToCharacter(nearest);
+        }
+        else
+        {
+            controlledCharacter = null;
+        }
+    }
+    
+    // Handle mouse input for character control
+    private void HandleMouseInput()
+    {
+        // Check for left mouse button click
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            // Get mouse position in world space
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+            Vector2 worldPos = mainCamera.ScreenToWorldPoint(mousePos);
+            
+            // Find all characters in the scene
+            ProceduralCharacterController[] characters = GameObject.FindObjectsByType<ProceduralCharacterController>(FindObjectsSortMode.None);
+            
+            // Find the character under the cursor
+            foreach (ProceduralCharacterController character in characters)
+            {
+                // Only allow taking control of characters that ARE in spectator mode
+                // (meaning they're not already controlled by the player)
+                if (!character.spectatorMode)
+                    continue;
+                    
+                // Skip characters with different team ID
+                if (character.teamId != teamId)
+                    continue;
+                
+                // Check if mouse is over this character
+                Collider2D collider = character.GetComponent<Collider2D>();
+                if (collider != null && collider.OverlapPoint(worldPos))
+                {
+                    // Switch to this character
+                    SwitchToCharacter(character);
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Switch to a specific character in overview mode
+    public void SwitchToCharacter(ProceduralCharacterController character)
+    {
+        if (character != null)
+        {
+            // Only allow switching to characters with matching team ID
+            if (character.teamId != teamId)
+                return;
+                
+            // Set as controlled character
+            controlledCharacter = character;
+            
+            // Enable camera attachment on the character
+            if (controlledCharacter != null)
+            {
+                controlledCharacter.attachCamera = true;
+            }
+            
+            // Move spectator to character position
+            transform.position = character.transform.position;
+            
+            // Reset velocity
+            currentVelocity = Vector2.zero;
+            targetVelocity = Vector2.zero;
+            
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector2.zero;
+            }
+        }
+    }
+    
+    // Check for CTRL key to release control
+    private void CheckControlRelease()
+    {
+        // Check if CTRL key is pressed and we have a controlled character
+        if (Keyboard.current != null && Keyboard.current.ctrlKey.wasPressedThisFrame && controlledCharacter != null)
+        {
+            // Release control of the character
+            ReleaseControl();
+        }
+    }
+    
+    // Release control of the current character
+    public void ReleaseControl()
+    {
+        if (controlledCharacter != null)
+        {
+            // Disable camera attachment on the character
+            controlledCharacter.attachCamera = false;
+            
+            // Reset character to spectator mode
+            controlledCharacter.SetSpectatorMode(true);
+            
+            // Clear reference
+            controlledCharacter = null;
+            
+            // Make sure camera is attached to spectator
+            if (mainCamera != null)
+            {
+                mainCamera.transform.SetParent(transform);
+                mainCamera.transform.localPosition = new Vector3(0, 0, -10);
+            }
+        }
+    }
+    
+    // Update camera position to smoothly follow the controlled character
+    private void UpdateCameraPosition()
+    {
+        if (mainCamera != null && controlledCharacter != null)
+        {
+            // Get current camera position
+            Vector3 cameraPosition = mainCamera.transform.position;
+            
+            // Calculate target position (keep z the same)
+            Vector3 targetPosition = new Vector3(
+                controlledCharacter.transform.position.x, 
+                controlledCharacter.transform.position.y, 
+                cameraPosition.z);
+            
+            // Smoothly move camera
+            mainCamera.transform.position = Vector3.Lerp(
+                cameraPosition, 
+                targetPosition, 
+                Time.deltaTime * cameraTransitionSpeed);
+        }
+    }
+}

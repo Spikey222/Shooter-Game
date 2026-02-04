@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 3
+  tags: []
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Feet
+    uniqueID: 4137564749
+    locked: 0
+  - name: Leg
+    uniqueID: 2216847249
+    locked: 0
+  - name: Hand
+    uniqueID: 2801902215
+    locked: 0
+  - name: Forearm
+    uniqueID: 3408084855
+    locked: 0
+  - name: Bicep
+    uniqueID: 2072738877
+    locked: 0
+  - name: Torso
+    uniqueID: 1079655485
+    locked: 0
+  - name: Head
+    uniqueID: 1939278827
+    locked: 0
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  m_RenderingLayers:
+  - Default

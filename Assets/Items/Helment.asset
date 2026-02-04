@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f68fe9ea0bb1db4f9c17888eb52324b, type: 3}
+  m_Name: Helment
+  m_EditorClassIdentifier: Assembly-CSharp::Item
+  itemName: Helemt
+  description: Item description
+  icon: {fileID: -8354326178130129612, guid: 12b82a2b92595144bbd6a08c0fc4fddc, type: 3}
+  weight: 1
+  itemType: 3
+  maxStackSize: 1
+  clothingEquipSlot: 0
+  overlaySprite: {fileID: -8354326178130129612, guid: 12b82a2b92595144bbd6a08c0fc4fddc, type: 3}
