@@ -49,19 +49,22 @@ public class BleedingController : MonoBehaviour
     [Tooltip("Offset from spawn position (e.g. slight down for ground)")]
     public Vector2 spawnOffset = Vector2.zero;
 
-    [Tooltip("Random radius added to spawn position")]
+    [Tooltip("Small random offset radius so drops don't stack exactly (0 = no offset)")]
     [Range(0f, 0.5f)]
-    public float spawnRandomRadius = 0.05f;
+    public float spawnRandomRadius = 0.04f;
 
     [Tooltip("Min/max scale for spawned blood (random in range)")]
     public Vector2 bloodScaleRange = new Vector2(0.8f, 1.2f);
 
     [Header("Sorting")]
-    [Tooltip("Sorting layer name for blood (e.g. Default or Ground)")]
+    [Tooltip("Sorting layer name for blood when not using character reference (e.g. Default or Ground)")]
     public string bloodSortingLayerName = "Default";
 
-    [Tooltip("Order in layer so blood renders under characters")]
-    public int bloodSortingOrder = -10;
+    [Tooltip("Order in layer when not using character reference. Lower = behind.")]
+    public int bloodSortingOrder = -100;
+
+    [Tooltip("Offset below character sprites (negative = behind). Used when character has a SpriteRenderer; ensures blood uses same layer and renders under.")]
+    public int bloodSortingOrderOffset = -20;
 
     [Header("Optional: Bleed Damage Over Time")]
     [Tooltip("If true, bleeding limbs take continuous damage")]
@@ -82,6 +85,7 @@ public class BleedingController : MonoBehaviour
     private ProceduralCharacterController characterController;
     private Dictionary<ProceduralCharacterController.LimbType, float> bleedAccumulators = new Dictionary<ProceduralCharacterController.LimbType, float>();
     private float bleedDoTTimer;
+    private SpriteRenderer characterSortingReference;
 
     private void Awake()
     {
@@ -90,6 +94,8 @@ public class BleedingController : MonoBehaviour
             characterController = GetComponentInParent<ProceduralCharacterController>();
         if (characterController == null)
             Debug.LogWarning("[BleedingController] No ProceduralCharacterController found.", this);
+        else
+            CacheCharacterSortingReference();
 
         if (limbBleedMultipliers == null || limbBleedMultipliers.Count == 0)
             ApplyDefaultBleedMultipliers();
@@ -121,6 +127,24 @@ public class BleedingController : MonoBehaviour
             new LimbBleedSetting { limbType = ProceduralCharacterController.LimbType.LeftCalf, bleedMultiplier = 1f },
             new LimbBleedSetting { limbType = ProceduralCharacterController.LimbType.LeftFoot, bleedMultiplier = 0.6f }
         };
+    }
+
+    private void CacheCharacterSortingReference()
+    {
+        characterSortingReference = null;
+        if (characterController == null) return;
+        if (characterController.torso != null)
+        {
+            characterSortingReference = characterController.torso.GetComponentInChildren<SpriteRenderer>();
+            if (characterSortingReference == null)
+                characterSortingReference = characterController.torso.GetComponent<SpriteRenderer>();
+        }
+        if (characterSortingReference == null)
+        {
+            ProceduralLimb limb = characterController.GetLimb(ProceduralCharacterController.LimbType.Torso);
+            if (limb != null)
+                characterSortingReference = limb.GetComponentInChildren<SpriteRenderer>();
+        }
     }
 
     private void InitializeAccumulators()
@@ -197,13 +221,14 @@ public class BleedingController : MonoBehaviour
     {
         Vector2 limbPos;
         Vector2 feetPos;
+        Vector2 characterWorldPos = (Vector2)characterController.transform.position;
 
         if (limbType == ProceduralCharacterController.LimbType.Torso)
         {
             if (characterController.torso != null)
-                limbPos = characterController.torso.position;
+                limbPos = characterController.torso.transform.position;
             else
-                limbPos = transform.position;
+                limbPos = characterWorldPos;
             feetPos = limbPos;
         }
         else
@@ -212,11 +237,11 @@ public class BleedingController : MonoBehaviour
             if (limb != null)
                 limbPos = limb.transform.position;
             else
-                limbPos = transform.position;
+                limbPos = characterWorldPos;
             if (characterController.torso != null)
-                feetPos = characterController.torso.position;
+                feetPos = characterController.torso.transform.position;
             else
-                feetPos = transform.position;
+                feetPos = characterWorldPos;
         }
 
         Vector2 pos;
@@ -241,20 +266,18 @@ public class BleedingController : MonoBehaviour
 
     private void SpawnBlood(Vector2 worldPosition, ProceduralCharacterController.LimbType source)
     {
+        Vector3 worldPos = new Vector3(worldPosition.x, worldPosition.y, 0f);
+
         if (bloodPrefab != null)
         {
-            GameObject go = Instantiate(bloodPrefab, bloodParent);
-            go.transform.position = new Vector3(worldPosition.x, worldPosition.y, 0f);
-            go.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
+            Quaternion rot = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
+            GameObject go = Instantiate(bloodPrefab, worldPos, rot, bloodParent);
+            go.transform.position = worldPos;
+            go.transform.rotation = rot;
             float scale = UnityEngine.Random.Range(bloodScaleRange.x, bloodScaleRange.y);
             go.transform.localScale = new Vector3(scale, scale, 1f);
 
-            SpriteRenderer sr = go.GetComponentInChildren<SpriteRenderer>();
-            if (sr != null)
-            {
-                sr.sortingLayerName = bloodSortingLayerName;
-                sr.sortingOrder = bloodSortingOrder;
-            }
+            ApplyBloodSorting(go);
             return;
         }
 
@@ -266,16 +289,33 @@ public class BleedingController : MonoBehaviour
             return;
 
         GameObject bloodGo = new GameObject("Blood");
-        bloodGo.transform.SetParent(bloodParent);
-        bloodGo.transform.position = new Vector3(worldPosition.x, worldPosition.y, 0f);
+        bloodGo.transform.position = worldPos;
+        bloodGo.transform.SetParent(bloodParent, true);
         bloodGo.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
         float s = UnityEngine.Random.Range(bloodScaleRange.x, bloodScaleRange.y);
         bloodGo.transform.localScale = new Vector3(s, s, 1f);
 
         SpriteRenderer renderer = bloodGo.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
-        renderer.sortingLayerName = bloodSortingLayerName;
-        renderer.sortingOrder = bloodSortingOrder;
+        ApplyBloodSorting(bloodGo);
+    }
+
+    private void ApplyBloodSorting(GameObject bloodObject)
+    {
+        SpriteRenderer[] renderers = bloodObject.GetComponentsInChildren<SpriteRenderer>(true);
+        foreach (SpriteRenderer sr in renderers)
+        {
+            if (characterSortingReference != null)
+            {
+                sr.sortingLayerID = characterSortingReference.sortingLayerID;
+                sr.sortingOrder = characterSortingReference.sortingOrder + bloodSortingOrderOffset;
+            }
+            else
+            {
+                sr.sortingLayerName = bloodSortingLayerName;
+                sr.sortingOrder = bloodSortingOrder;
+            }
+        }
     }
 
     private void ApplyBleedDoT()

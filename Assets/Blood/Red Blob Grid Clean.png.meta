@@ -1,0 +1,767 @@
+fileFormatVersion: 2
+guid: a4fc7c78cbec9304794f82e4aa864b22
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 7985637368474027240
+    second: Red Blob Grid Clean_0
+  - first:
+      213: 2177821145256504337
+    second: Red Blob Grid Clean_1
+  - first:
+      213: 459796937887709449
+    second: Red Blob Grid Clean_2
+  - first:
+      213: -8715522111612560999
+    second: Red Blob Grid Clean_3
+  - first:
+      213: 9157898931558493308
+    second: Red Blob Grid Clean_4
+  - first:
+      213: -7626743386702930533
+    second: Red Blob Grid Clean_5
+  - first:
+      213: -1361206921780326416
+    second: Red Blob Grid Clean_6
+  - first:
+      213: 4657242805056336402
+    second: Red Blob Grid Clean_7
+  - first:
+      213: 7333157495081757635
+    second: Red Blob Grid Clean_8
+  - first:
+      213: 1419291009931804959
+    second: Red Blob Grid Clean_9
+  - first:
+      213: -5954857593417673565
+    second: Red Blob Grid Clean_10
+  - first:
+      213: 7791728318968904346
+    second: Red Blob Grid Clean_11
+  - first:
+      213: 2957085538461189078
+    second: Red Blob Grid Clean_12
+  - first:
+      213: 4172698671189332140
+    second: Red Blob Grid Clean_13
+  - first:
+      213: -4888314348066506554
+    second: Red Blob Grid Clean_14
+  - first:
+      213: 6199945622407214413
+    second: Red Blob Grid Clean_15
+  - first:
+      213: -8482852040008366995
+    second: Red Blob Grid Clean_16
+  - first:
+      213: -8991715859113289824
+    second: Red Blob Grid Clean_17
+  - first:
+      213: 339391633587898856
+    second: Red Blob Grid Clean_18
+  - first:
+      213: -595176932553120349
+    second: Red Blob Grid Clean_19
+  - first:
+      213: 8800414567675001183
+    second: Red Blob Grid Clean_20
+  - first:
+      213: 8630077311395713487
+    second: Red Blob Grid Clean_21
+  - first:
+      213: 1550761269783794787
+    second: Red Blob Grid Clean_22
+  - first:
+      213: -136004774169296543
+    second: Red Blob Grid Clean_23
+  - first:
+      213: -1285587788183454416
+    second: Red Blob Grid Clean_24
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 600
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_0
+      rect:
+        serializedVersion: 2
+        x: 77
+        y: 867
+        width: 85
+        height: 101
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e4cafc70eea2de60800000000000000
+      internalID: 7985637368474027240
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_1
+      rect:
+        serializedVersion: 2
+        x: 277
+        y: 857
+        width: 80
+        height: 122
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 11c29530bcc293e10800000000000000
+      internalID: 2177821145256504337
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_2
+      rect:
+        serializedVersion: 2
+        x: 471
+        y: 867
+        width: 83
+        height: 102
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 909fb9ff0e6816600800000000000000
+      internalID: 459796937887709449
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_3
+      rect:
+        serializedVersion: 2
+        x: 662
+        y: 866
+        width: 89
+        height: 105
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9995549f0de3c0780800000000000000
+      internalID: -8715522111612560999
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_4
+      rect:
+        serializedVersion: 2
+        x: 861
+        y: 867
+        width: 90
+        height: 102
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c7c2970ce84671f70800000000000000
+      internalID: 9157898931558493308
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_5
+      rect:
+        serializedVersion: 2
+        x: 80
+        y: 660
+        width: 80
+        height: 104
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b9d138a4c4d582690800000000000000
+      internalID: -7626743386702930533
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_6
+      rect:
+        serializedVersion: 2
+        x: 271
+        y: 656
+        width: 92
+        height: 111
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0ff0b7144850c1de0800000000000000
+      internalID: -1361206921780326416
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_7
+      rect:
+        serializedVersion: 2
+        x: 474
+        y: 654
+        width: 76
+        height: 117
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2127024f7a9d1a040800000000000000
+      internalID: 4657242805056336402
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_8
+      rect:
+        serializedVersion: 2
+        x: 665
+        y: 651
+        width: 83
+        height: 123
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3cb675893eb94c560800000000000000
+      internalID: 7333157495081757635
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_9
+      rect:
+        serializedVersion: 2
+        x: 859
+        y: 657
+        width: 92
+        height: 110
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f1104ef57a552b310800000000000000
+      internalID: 1419291009931804959
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_10
+      rect:
+        serializedVersion: 2
+        x: 74
+        y: 458
+        width: 91
+        height: 109
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a45d48a1981c5da0800000000000000
+      internalID: -5954857593417673565
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_11
+      rect:
+        serializedVersion: 2
+        x: 271
+        y: 453
+        width: 92
+        height: 118
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a9a3e7eaf97c12c60800000000000000
+      internalID: 7791728318968904346
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_12
+      rect:
+        serializedVersion: 2
+        x: 461
+        y: 468
+        width: 102
+        height: 88
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6d38c6241ada90920800000000000000
+      internalID: 2957085538461189078
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_13
+      rect:
+        serializedVersion: 2
+        x: 657
+        y: 457
+        width: 100
+        height: 111
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ca01cf2655768e930800000000000000
+      internalID: 4172698671189332140
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_14
+      rect:
+        serializedVersion: 2
+        x: 866
+        y: 456
+        width: 77
+        height: 113
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6c8fc05fff7392cb0800000000000000
+      internalID: -4888314348066506554
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_15
+      rect:
+        serializedVersion: 2
+        x: 77
+        y: 265
+        width: 85
+        height: 105
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d45f152e1b1aa0650800000000000000
+      internalID: 6199945622407214413
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_16
+      rect:
+        serializedVersion: 2
+        x: 276
+        y: 260
+        width: 81
+        height: 115
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d648a11830bd64a80800000000000000
+      internalID: -8482852040008366995
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_17
+      rect:
+        serializedVersion: 2
+        x: 461
+        y: 273
+        width: 103
+        height: 89
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0a75e48f012073380800000000000000
+      internalID: -8991715859113289824
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_18
+      rect:
+        serializedVersion: 2
+        x: 654
+        y: 262
+        width: 104
+        height: 112
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e90fbf74e2c5b400800000000000000
+      internalID: 339391633587898856
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_19
+      rect:
+        serializedVersion: 2
+        x: 856
+        y: 275
+        width: 99
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a52aa4bbb18db7f0800000000000000
+      internalID: -595176932553120349
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_20
+      rect:
+        serializedVersion: 2
+        x: 70
+        y: 77
+        width: 99
+        height: 90
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f59f0763c6a512a70800000000000000
+      internalID: 8800414567675001183
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_21
+      rect:
+        serializedVersion: 2
+        x: 273
+        y: 67
+        width: 86
+        height: 112
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fc156e1379134c770800000000000000
+      internalID: 8630077311395713487
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_22
+      rect:
+        serializedVersion: 2
+        x: 460
+        y: 77
+        width: 104
+        height: 91
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 36495e89829658510800000000000000
+      internalID: 1550761269783794787
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_23
+      rect:
+        serializedVersion: 2
+        x: 665
+        y: 71
+        width: 82
+        height: 103
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 161c1e3e060dc1ef0800000000000000
+      internalID: -136004774169296543
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Red Blob Grid Clean_24
+      rect:
+        serializedVersion: 2
+        x: 866
+        y: 81
+        width: 79
+        height: 82
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 03dbebdc7bca82ee0800000000000000
+      internalID: -1285587788183454416
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Red Blob Grid Clean_0: 7985637368474027240
+      Red Blob Grid Clean_1: 2177821145256504337
+      Red Blob Grid Clean_10: -5954857593417673565
+      Red Blob Grid Clean_11: 7791728318968904346
+      Red Blob Grid Clean_12: 2957085538461189078
+      Red Blob Grid Clean_13: 4172698671189332140
+      Red Blob Grid Clean_14: -4888314348066506554
+      Red Blob Grid Clean_15: 6199945622407214413
+      Red Blob Grid Clean_16: -8482852040008366995
+      Red Blob Grid Clean_17: -8991715859113289824
+      Red Blob Grid Clean_18: 339391633587898856
+      Red Blob Grid Clean_19: -595176932553120349
+      Red Blob Grid Clean_2: 459796937887709449
+      Red Blob Grid Clean_20: 8800414567675001183
+      Red Blob Grid Clean_21: 8630077311395713487
+      Red Blob Grid Clean_22: 1550761269783794787
+      Red Blob Grid Clean_23: -136004774169296543
+      Red Blob Grid Clean_24: -1285587788183454416
+      Red Blob Grid Clean_3: -8715522111612560999
+      Red Blob Grid Clean_4: 9157898931558493308
+      Red Blob Grid Clean_5: -7626743386702930533
+      Red Blob Grid Clean_6: -1361206921780326416
+      Red Blob Grid Clean_7: 4657242805056336402
+      Red Blob Grid Clean_8: 7333157495081757635
+      Red Blob Grid Clean_9: 1419291009931804959
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

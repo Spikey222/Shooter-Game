@@ -1,0 +1,533 @@
+fileFormatVersion: 2
+guid: 1dfcff623eac8254fb58da8cc96bd826
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 7829905510543766856
+    second: Vibrant Blood 3_0
+  - first:
+      213: 8140373082750369576
+    second: Vibrant Blood 3_1
+  - first:
+      213: 6525857011845746739
+    second: Vibrant Blood 3_2
+  - first:
+      213: -8363090934746901709
+    second: Vibrant Blood 3_3
+  - first:
+      213: 7804022398828323265
+    second: Vibrant Blood 3_4
+  - first:
+      213: 6986449175402800379
+    second: Vibrant Blood 3_5
+  - first:
+      213: -113241222955763040
+    second: Vibrant Blood 3_6
+  - first:
+      213: 2061550374685546728
+    second: Vibrant Blood 3_7
+  - first:
+      213: -4737229329280192747
+    second: Vibrant Blood 3_8
+  - first:
+      213: 6613843409624326087
+    second: Vibrant Blood 3_9
+  - first:
+      213: 1239723987939871257
+    second: Vibrant Blood 3_10
+  - first:
+      213: 2268327214728920981
+    second: Vibrant Blood 3_11
+  - first:
+      213: 6531775306818448173
+    second: Vibrant Blood 3_12
+  - first:
+      213: -6996503410570215921
+    second: Vibrant Blood 3_13
+  - first:
+      213: 4178846973582380194
+    second: Vibrant Blood 3_14
+  - first:
+      213: -4141907339751642028
+    second: Vibrant Blood 3_15
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Vibrant Blood 3_0
+      rect:
+        serializedVersion: 2
+        x: 677
+        y: 813
+        width: 25
+        height: 28
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 845b5d4c39969ac60800000000000000
+      internalID: 7829905510543766856
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_1
+      rect:
+        serializedVersion: 2
+        x: 727
+        y: 758
+        width: 81
+        height: 82
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 82fbc70703a68f070800000000000000
+      internalID: 8140373082750369576
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_2
+      rect:
+        serializedVersion: 2
+        x: 217
+        y: 255
+        width: 570
+        height: 502
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 330de067060809a50800000000000000
+      internalID: 6525857011845746739
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_3
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 689
+        width: 122
+        height: 100
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3331f1aba1550fb80800000000000000
+      internalID: -8363090934746901709
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_4
+      rect:
+        serializedVersion: 2
+        x: 387
+        y: 721
+        width: 35
+        height: 43
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1c1aa5536057d4c60800000000000000
+      internalID: 7804022398828323265
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_5
+      rect:
+        serializedVersion: 2
+        x: 631
+        y: 748
+        width: 48
+        height: 57
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bf4643d528ad4f060800000000000000
+      internalID: 6986449175402800379
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_6
+      rect:
+        serializedVersion: 2
+        x: 748
+        y: 711
+        width: 46
+        height: 41
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0aa7acb25bfad6ef0800000000000000
+      internalID: -113241222955763040
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_7
+      rect:
+        serializedVersion: 2
+        x: 796
+        y: 619
+        width: 87
+        height: 51
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8e894b9a4291c9c10800000000000000
+      internalID: 2061550374685546728
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_8
+      rect:
+        serializedVersion: 2
+        x: 171
+        y: 438
+        width: 74
+        height: 52
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 51f21b0260bf14eb0800000000000000
+      internalID: -4737229329280192747
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_9
+      rect:
+        serializedVersion: 2
+        x: 748
+        y: 478
+        width: 81
+        height: 71
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7cf57b61a8719cb50800000000000000
+      internalID: 6613843409624326087
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_10
+      rect:
+        serializedVersion: 2
+        x: 761
+        y: 389
+        width: 52
+        height: 42
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 91acfa01662643110800000000000000
+      internalID: 1239723987939871257
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_11
+      rect:
+        serializedVersion: 2
+        x: 818
+        y: 417
+        width: 51
+        height: 38
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 59fb44c6597ba7f10800000000000000
+      internalID: 2268327214728920981
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_12
+      rect:
+        serializedVersion: 2
+        x: 220
+        y: 206
+        width: 50
+        height: 55
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d2be493e80785aa50800000000000000
+      internalID: 6531775306818448173
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_13
+      rect:
+        serializedVersion: 2
+        x: 280
+        y: 236
+        width: 80
+        height: 95
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f0e3727973d67ee90800000000000000
+      internalID: -6996503410570215921
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_14
+      rect:
+        serializedVersion: 2
+        x: 615
+        y: 203
+        width: 76
+        height: 82
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2ac08179e2f3ef930800000000000000
+      internalID: 4178846973582380194
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Vibrant Blood 3_15
+      rect:
+        serializedVersion: 2
+        x: 698
+        y: 215
+        width: 38
+        height: 41
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 45c2581283df486c0800000000000000
+      internalID: -4141907339751642028
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Vibrant Blood 3_0: 7829905510543766856
+      Vibrant Blood 3_1: 8140373082750369576
+      Vibrant Blood 3_10: 1239723987939871257
+      Vibrant Blood 3_11: 2268327214728920981
+      Vibrant Blood 3_12: 6531775306818448173
+      Vibrant Blood 3_13: -6996503410570215921
+      Vibrant Blood 3_14: 4178846973582380194
+      Vibrant Blood 3_15: -4141907339751642028
+      Vibrant Blood 3_2: 6525857011845746739
+      Vibrant Blood 3_3: -8363090934746901709
+      Vibrant Blood 3_4: 7804022398828323265
+      Vibrant Blood 3_5: 6986449175402800379
+      Vibrant Blood 3_6: -113241222955763040
+      Vibrant Blood 3_7: 2061550374685546728
+      Vibrant Blood 3_8: -4737229329280192747
+      Vibrant Blood 3_9: 6613843409624326087
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
