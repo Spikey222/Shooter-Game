@@ -1493,6 +1493,61 @@ public class ProceduralCharacterController : MonoBehaviour
     }
     
     /// <summary>
+    /// Get the LimbType for a collider that belongs to this character (torso or any limb).
+    /// Returns null if the collider does not belong to this character.
+    /// Checks limbs first (more specific) since limbs may be children of torso.
+    /// </summary>
+    public LimbType? GetLimbTypeForCollider(Collider2D collider)
+    {
+        if (collider == null) return null;
+        
+        Transform colliderTransform = collider.transform;
+        
+        // Check limbs first (more specific - limbs may be children of torso)
+        foreach (var kvp in limbMap)
+        {
+            if (kvp.Value != null && (colliderTransform == kvp.Value.transform || colliderTransform.IsChildOf(kvp.Value.transform)))
+            {
+                return kvp.Key;
+            }
+        }
+        
+        // Check torso
+        if (torso != null && (colliderTransform == torso.transform || colliderTransform.IsChildOf(torso.transform)))
+        {
+            return LimbType.Torso;
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Select a random limb for knife torso-contact damage. High bias: Head, Neck, Torso. Low bias: Forearms, Hands, Thighs, Feet, Calves.
+    /// </summary>
+    public LimbType SelectKnifeTorsoContactLimb(float headChance, float neckChance, float torsoChance,
+        float forearmChance, float handChance, float thighChance, float calfChance, float footChance)
+    {
+        float total = headChance + neckChance + torsoChance
+            + (forearmChance * 2) + (handChance * 2)
+            + (thighChance * 2) + (calfChance * 2) + (footChance * 2);
+        float r = UnityEngine.Random.Range(0f, total);
+        
+        if ((r -= headChance) <= 0) return LimbType.Head;
+        if ((r -= neckChance) <= 0) return LimbType.Neck;
+        if ((r -= torsoChance) <= 0) return LimbType.Torso;
+        if ((r -= forearmChance) <= 0) return LimbType.RightForearm;
+        if ((r -= forearmChance) <= 0) return LimbType.LeftForearm;
+        if ((r -= handChance) <= 0) return LimbType.RightHand;
+        if ((r -= handChance) <= 0) return LimbType.LeftHand;
+        if ((r -= thighChance) <= 0) return LimbType.RightThigh;
+        if ((r -= thighChance) <= 0) return LimbType.LeftThigh;
+        if ((r -= calfChance) <= 0) return LimbType.RightCalf;
+        if ((r -= calfChance) <= 0) return LimbType.LeftCalf;
+        if ((r -= footChance) <= 0) return LimbType.RightFoot;
+        return LimbType.LeftFoot;
+    }
+    
+    /// <summary>
     /// Get the currently selected weapon sprite override
     /// </summary>
     public WeaponSpriteOverride GetSelectedSpriteOverride()

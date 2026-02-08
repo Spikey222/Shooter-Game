@@ -3155,7 +3155,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 128817609752393997, guid: 256ad179088f5d04e87e7a7ecf14935b, type: 3}
       propertyPath: hitProbabilities.Array.data[11].limbType
-      value: 8
+      value: 12
       objectReference: {fileID: 0}
     - target: {fileID: 128817609752393997, guid: 256ad179088f5d04e87e7a7ecf14935b, type: 3}
       propertyPath: hitProbabilities.Array.data[1].hitChance
@@ -3199,7 +3199,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 128817609752393997, guid: 256ad179088f5d04e87e7a7ecf14935b, type: 3}
       propertyPath: hitProbabilities.Array.data[11].hitChance
-      value: 18
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 1088975282964916501, guid: 256ad179088f5d04e87e7a7ecf14935b, type: 3}
       propertyPath: m_LocalPosition.x

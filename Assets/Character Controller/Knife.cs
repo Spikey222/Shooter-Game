@@ -18,6 +18,19 @@ public class Knife : Weapon
     [Tooltip("Damage multiplier for knife attacks")]
     public float damageMultiplier = 1.0f;
     
+    [Header("Knife Contact Damage - Torso Exception")]
+    [Tooltip("When knife hits torso, damage is randomly applied. High bias parts (Head, Neck, Torso):")]
+    [Range(0f, 100f)] public float torsoContactHeadChance = 26f;
+    [Range(0f, 100f)] public float torsoContactNeckChance = 26f;
+    [Range(0f, 100f)] public float torsoContactTorsoChance = 32f;
+    [Tooltip("Moderate-low bias parts (Forearms, Hands):")]
+    [Range(0f, 10f)] public float torsoContactForearmChance = 2f;
+    [Range(0f, 10f)] public float torsoContactHandChance = 1.5f;
+    [Tooltip("Low bias parts (Thighs, Calves, Feet) - extreme low hit chance:")]
+    [Range(0f, 10f)] public float torsoContactThighChance = 1.5f;
+    [Range(0f, 10f)] public float torsoContactCalfChance = 1.5f;
+    [Range(0f, 10f)] public float torsoContactFootChance = 1f;
+    
     [Header("Sprite Settings")]
     [Tooltip("Sprite override index to use from character controller (leave at -1 to use character's selected index)")]
     public int spriteOverrideIndex = -1;
@@ -234,6 +247,7 @@ public class Knife : Weapon
     
     /// <summary>
     /// Check for targets in range of the knife and deal damage once per target per animation. Called every frame while the damage window is active.
+    /// Knife uses contact-based damage: damages the part the knife makes contact with. Exception: if contact is torso, randomly damages Head/Neck/Torso (high bias) or Thighs/Calves/Feet (low bias).
     /// </summary>
     private void TryDealDamageThisFrame()
     {
@@ -247,27 +261,71 @@ public class Knife : Weapon
         
         Collider2D[] hits = Physics2D.OverlapCircleAll(checkCenter, attackRange);
         
-        HashSet<ProceduralCharacterController> uniqueTargets = new HashSet<ProceduralCharacterController>();
+        // Group colliders by target, keeping the closest collider per target (primary contact)
+        Dictionary<ProceduralCharacterController, Collider2D> targetToContactCollider = new Dictionary<ProceduralCharacterController, Collider2D>();
         foreach (Collider2D hit in hits)
         {
             ProceduralCharacterController target = hit.GetComponentInParent<ProceduralCharacterController>();
             if (target == null || target == characterController)
                 continue;
-            uniqueTargets.Add(target);
+            
+            // Only count colliders that belong to this character (torso or limbs)
+            if (target.GetLimbTypeForCollider(hit) == null)
+                continue;
+            
+            float distSq = ((Vector2)hit.ClosestPoint(checkCenter) - checkCenter).sqrMagnitude;
+            if (!targetToContactCollider.TryGetValue(target, out Collider2D existing) ||
+                ((Vector2)existing.ClosestPoint(checkCenter) - checkCenter).sqrMagnitude > distSq)
+            {
+                targetToContactCollider[target] = hit;
+            }
         }
         
         bool hitAnyTarget = false;
-        foreach (ProceduralCharacterController target in uniqueTargets)
+        foreach (var kvp in targetToContactCollider)
         {
+            ProceduralCharacterController target = kvp.Key;
+            Collider2D contactCollider = kvp.Value;
             if (hitTargetsThisAttack.Contains(target))
                 continue;
             hitTargetsThisAttack.Add(target);
             hitAnyTarget = true;
-            TakeDamageWithWeapon(target);
+            TakeKnifeDamageToTarget(target, contactCollider);
         }
         
         if (hitAnyTarget && stabSound != null && audioSource != null)
             audioSource.PlayOneShot(stabSound, stabVolume);
+    }
+    
+    /// <summary>
+    /// Apply knife damage to a target based on contact. Damages the contacted part directly, unless contact is torso—then uses weighted random (Head/Neck/Torso high bias, Thighs/Calves/Feet low bias).
+    /// </summary>
+    private void TakeKnifeDamageToTarget(ProceduralCharacterController target, Collider2D contactCollider)
+    {
+        if (target == null) return;
+        
+        float damage = baseDamage * damageMultiplier;
+        var contactLimbType = target.GetLimbTypeForCollider(contactCollider);
+        if (contactLimbType == null)
+        {
+            target.ApplyDamageToLimb(ProceduralCharacterController.LimbType.Torso, damage);
+            return;
+        }
+        
+        ProceduralCharacterController.LimbType limbToDamage;
+        if (contactLimbType == ProceduralCharacterController.LimbType.Torso)
+        {
+            limbToDamage = target.SelectKnifeTorsoContactLimb(
+                torsoContactHeadChance, torsoContactNeckChance, torsoContactTorsoChance,
+                torsoContactForearmChance, torsoContactHandChance,
+                torsoContactThighChance, torsoContactCalfChance, torsoContactFootChance);
+        }
+        else
+        {
+            limbToDamage = contactLimbType.Value;
+        }
+        
+        target.ApplyDamageToLimb(limbToDamage, damage);
     }
     
     /// <summary>
