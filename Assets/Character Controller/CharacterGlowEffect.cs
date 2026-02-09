@@ -30,6 +30,10 @@ public class CharacterGlowEffect : MonoBehaviour
     [Tooltip("Height of the hover rectangle if not using collider")]
     public float hoverHeight = 1.5f;
     
+    [Header("Debug")]
+    [Tooltip("Log highlight/restore messages to Console")]
+    public bool logHighlightToConsole = false;
+    
     // References
     private SpriteRenderer torsoRenderer;
     private ProceduralCharacterController characterController;
@@ -226,7 +230,8 @@ public class CharacterGlowEffect : MonoBehaviour
         // Apply initial highlight color
         UpdatePulsatingEffect();
         
-        Debug.Log("Applying highlight to all limbs");
+        if (logHighlightToConsole)
+            Debug.Log("Applying highlight to all limbs");
     }
     
     private void UpdatePulsatingEffect()
@@ -327,7 +332,8 @@ public class CharacterGlowEffect : MonoBehaviour
             }
         }
         
-        Debug.Log("Restored original colors for all sprites");
+        if (logHighlightToConsole)
+            Debug.Log("Restored original colors for all sprites");
     }
     
     private bool IsCharacterControllable()

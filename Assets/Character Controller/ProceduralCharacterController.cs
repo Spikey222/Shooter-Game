@@ -45,7 +45,7 @@ public class ProceduralCharacterController : MonoBehaviour
     
     [Header("Debug")]
     [Tooltip("Log damage to Console (character name, body part, amount)")]
-    public bool logDamageToConsole = true;
+    public bool logDamageToConsole = false;
     
     // Used to ignore attack only in the frame we were possessed (avoids attacking on the same click that selected this character)
     private bool ignoreNextAttackInput = false;
@@ -748,10 +748,10 @@ public class ProceduralCharacterController : MonoBehaviour
             // Set initial position
             UpdateEquippedItemPosition();
             
-            // Handle Knife-specific equipping (character-specific sprites)
-            if (item is Knife knife)
+            // Handle one-handed weapon equipping (character-specific sprites)
+            if (item is WeaponOneHanded oneHanded)
             {
-                knife.OnEquipped(this);
+                oneHanded.OnEquipped(this);
             }
             else
             {
@@ -784,10 +784,10 @@ public class ProceduralCharacterController : MonoBehaviour
         {
             EquippableItem itemToUnequip = equippedItem;
             
-            // Handle Knife-specific unequipping (character-specific sprites)
-            if (itemToUnequip is Knife knife)
+            // Handle one-handed weapon unequipping (character-specific sprites)
+            if (itemToUnequip is WeaponOneHanded oneHandedUnequip)
             {
-                knife.OnUnequipped(this);
+                oneHandedUnequip.OnUnequipped(this);
             }
             else
             {
@@ -1661,12 +1661,11 @@ public class ProceduralCharacterController : MonoBehaviour
         return damageDealt;
     }
     
-    // Convenience method to take damage from a weapon
+    // Convenience method to take damage from a weapon (weapon applies damage via its own TakeDamageWithWeapon)
     public float TakeDamageWithWeapon(Weapon weapon)
     {
         if (weapon == null)
             return 0f;
-        
-        return TakeDamageWithProbability(weapon.baseDamage, weapon.hitProbabilities);
+        return weapon.TakeDamageWithWeapon(this);
     }
 }
