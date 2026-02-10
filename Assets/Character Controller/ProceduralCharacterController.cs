@@ -1454,9 +1454,20 @@ public class ProceduralCharacterController : MonoBehaviour
         }
     }
     
-    // Heal a specific limb
+    // Heal a specific limb (or torso; does not directly heal overall/total HP)
     public float HealLimb(LimbType limbType, float amount)
     {
+        // Special handling for Torso since it's not a ProceduralLimb
+        if (limbType == LimbType.Torso)
+        {
+            float oldTorsoHealth = torsoHealth;
+            torsoHealth = Mathf.Min(torsoMaxHealth, torsoHealth + amount);
+            previousTorsoHealth = torsoHealth;
+            float actualHealed = torsoHealth - oldTorsoHealth;
+            OnLimbHealthChanged?.Invoke(LimbType.Torso, torsoHealth, torsoMaxHealth);
+            UpdateOverallHealth();
+            return actualHealed;
+        }
         if (limbMap.TryGetValue(limbType, out ProceduralLimb limb))
         {
             return limb.Heal(amount);
@@ -1464,12 +1475,21 @@ public class ProceduralCharacterController : MonoBehaviour
         return 0f;
     }
     
-    // Heal all limbs
+    // Heal all limbs and torso (does not directly heal overall/total HP)
     public void HealAllLimbs(float amount)
     {
         foreach (var limb in limbMap.Values)
         {
             limb.Heal(amount);
+        }
+        // Heal torso separately (torso is not in limbMap)
+        float oldTorsoHealth = torsoHealth;
+        torsoHealth = Mathf.Min(torsoMaxHealth, torsoHealth + amount);
+        previousTorsoHealth = torsoHealth;
+        if (torsoHealth != oldTorsoHealth)
+        {
+            OnLimbHealthChanged?.Invoke(LimbType.Torso, torsoHealth, torsoMaxHealth);
+            UpdateOverallHealth();
         }
     }
     
@@ -1493,9 +1513,25 @@ public class ProceduralCharacterController : MonoBehaviour
     }
     
     /// <summary>
+    /// Order to check limbs: most specific (end of chain) first, so hand/forearm hit returns
+    /// Hand/Forearm, not the parent Bicep. Arm chain: Bicep -> Forearm -> Hand.
+    /// </summary>
+    private static readonly LimbType[] LimbSpecificityOrder = new LimbType[]
+    {
+        LimbType.RightHand, LimbType.LeftHand,
+        LimbType.RightForearm, LimbType.LeftForearm,
+        LimbType.RightBicep, LimbType.LeftBicep,
+        LimbType.RightFoot, LimbType.LeftFoot,
+        LimbType.RightCalf, LimbType.LeftCalf,
+        LimbType.RightThigh, LimbType.LeftThigh,
+        LimbType.Head, LimbType.Neck
+    };
+
+    /// <summary>
     /// Get the LimbType for a collider that belongs to this character (torso or any limb).
     /// Returns null if the collider does not belong to this character.
-    /// Checks limbs first (more specific) since limbs may be children of torso.
+    /// Checks most-specific limbs first (Hand, Forearm before Bicep) so contact on hand/forearm
+    /// damages that part, not the parent.
     /// </summary>
     public LimbType? GetLimbTypeForCollider(Collider2D collider)
     {
@@ -1503,16 +1539,17 @@ public class ProceduralCharacterController : MonoBehaviour
         
         Transform colliderTransform = collider.transform;
         
-        // Check limbs first (more specific - limbs may be children of torso)
-        foreach (var kvp in limbMap)
+        // Check limbs in specificity order (Hand/Forearm before Bicep) so we damage the contacted part
+        foreach (LimbType limbType in LimbSpecificityOrder)
         {
-            if (kvp.Value != null && (colliderTransform == kvp.Value.transform || colliderTransform.IsChildOf(kvp.Value.transform)))
+            if (limbMap.TryGetValue(limbType, out ProceduralLimb limb) && limb != null
+                && (colliderTransform == limb.transform || colliderTransform.IsChildOf(limb.transform)))
             {
-                return kvp.Key;
+                return limbType;
             }
         }
         
-        // Check torso
+        // Check torso last (least specific)
         if (torso != null && (colliderTransform == torso.transform || colliderTransform.IsChildOf(torso.transform)))
         {
             return LimbType.Torso;

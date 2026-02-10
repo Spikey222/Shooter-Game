@@ -60,6 +60,43 @@ public class InventorySlotUI : MonoBehaviour
         }
     }
 
+    private void AutoWireDisplayReferencesIfNeeded()
+    {
+        if (nameText != null && weightText != null && quantityText != null && iconImage != null)
+            return;
+
+        Transform[] all = GetComponentsInChildren<Transform>(true);
+        foreach (var t in all)
+        {
+            if (t == null)
+                continue;
+            if (nameText == null && t.name == "NameText")
+            {
+                var tmp = t.GetComponent<TextMeshProUGUI>();
+                if (tmp != null)
+                    nameText = tmp;
+            }
+            else if (weightText == null && t.name == "WeightText")
+            {
+                var tmp = t.GetComponent<TextMeshProUGUI>();
+                if (tmp != null)
+                    weightText = tmp;
+            }
+            else if (quantityText == null && t.name == "QuantityText")
+            {
+                var tmp = t.GetComponent<TextMeshProUGUI>();
+                if (tmp != null)
+                    quantityText = tmp;
+            }
+            else if (iconImage == null && (t.name == "Image" || t.name == "Icon"))
+            {
+                var img = t.GetComponent<Image>();
+                if (img != null)
+                    iconImage = img;
+            }
+        }
+    }
+
     private void AutoWireButtonsIfNeeded()
     {
         // If the prefab didn't assign slotButton, try to find a reasonable default.
@@ -94,6 +131,7 @@ public class InventorySlotUI : MonoBehaviour
         slotIndex = index;
         parentUI = parent;
 
+        AutoWireDisplayReferencesIfNeeded();
         AutoWireButtonsIfNeeded();
         AutoWireEquippedIndicatorIfNeeded();
         
@@ -155,6 +193,7 @@ public class InventorySlotUI : MonoBehaviour
         if (nameText != null)
         {
             nameText.text = item.itemName;
+            nameText.gameObject.SetActive(true);
         }
         
         // Set quantity (only show if stackable and quantity > 1)
@@ -177,6 +216,7 @@ public class InventorySlotUI : MonoBehaviour
             float totalWeightKg = inventoryItem.GetTotalWeight();
             float totalWeightLb = totalWeightKg * PoundsPerKilogram;
             weightText.text = $"{totalWeightLb:F1} lb";
+            weightText.gameObject.SetActive(true);
         }
 
         // Equipped indicator (for clothing and weapons)

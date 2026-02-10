@@ -39,13 +39,6 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("Slider/Progress bar for weight (optional)")]
     public Slider weightSlider;
 
-    [Header("Layout (Optional)")]
-    [Tooltip("If the itemSlotsParent uses a GridLayoutGroup, force its cell size.")]
-    public bool forceGridCellSize = true;
-
-    [Tooltip("Grid cell size for inventory slots (width, height).")]
-    public Vector2 gridCellSize = new Vector2(208f, 208f);
-
     [Tooltip("If true, destroy any existing children under itemSlotsParent when rebuilding UI (prevents leftover template slots).")]
     public bool clearAllChildrenUnderSlotsParent = true;
     
@@ -64,6 +57,14 @@ public class InventoryUI : MonoBehaviour
 
     [Tooltip("If true, inventory UI auto-hides when you unpossess.")]
     public bool hideWhenUnpossessed = true;
+
+    [Header("Body Outline Position")]
+    [Tooltip("Assign BodyOutline > Outline RectTransform here. It will move when inventory opens/closes.")]
+    public RectTransform bodyOutlineOutline;
+    [Tooltip("Position when inventory is closed (neutral).")]
+    public Vector2 bodyOutlinePositionClosed = new Vector2(286f, 299f);
+    [Tooltip("Position when inventory is open.")]
+    public Vector2 bodyOutlinePositionOpen = new Vector2(673f, 579f);
     
     private const float PoundsPerKilogram = 2.20462262f;
 
@@ -72,8 +73,6 @@ public class InventoryUI : MonoBehaviour
     
     private void Start()
     {
-        ApplyGridLayoutSettings();
-
         if (autoLinkToPossessedCharacter)
         {
             if (spectatorController == null)
@@ -104,10 +103,29 @@ public class InventoryUI : MonoBehaviour
             if (!allowOpenWhenUnpossessed && character == null)
                 shouldShow = false;
             inventoryPanel.SetActive(shouldShow);
+            ApplyBodyOutlinePosition(shouldShow);
         }
         
         // Initial UI update
         UpdateUI();
+    }
+
+    private void ApplyBodyOutlinePosition(bool inventoryOpen)
+    {
+        if (bodyOutlineOutline == null)
+            return;
+        if (inventoryOpen)
+        {
+            bodyOutlineOutline.anchorMin = new Vector2(0.5f, 0.5f);
+            bodyOutlineOutline.anchorMax = new Vector2(0.5f, 0.5f);
+            bodyOutlineOutline.anchoredPosition = bodyOutlinePositionOpen;
+        }
+        else
+        {
+            bodyOutlineOutline.anchorMin = Vector2.zero;
+            bodyOutlineOutline.anchorMax = Vector2.zero;
+            bodyOutlineOutline.anchoredPosition = bodyOutlinePositionClosed;
+        }
     }
     
     private void Update()
@@ -135,7 +153,7 @@ public class InventoryUI : MonoBehaviour
 
             bool newState = !inventoryPanel.activeSelf;
             inventoryPanel.SetActive(newState);
-            
+            ApplyBodyOutlinePosition(newState);
             if (newState)
             {
                 UpdateUI();
@@ -154,6 +172,7 @@ public class InventoryUI : MonoBehaviour
                 return;
 
             inventoryPanel.SetActive(true);
+            ApplyBodyOutlinePosition(true);
             UpdateUI();
         }
     }
@@ -166,6 +185,7 @@ public class InventoryUI : MonoBehaviour
         if (inventoryPanel != null)
         {
             inventoryPanel.SetActive(false);
+            ApplyBodyOutlinePosition(false);
         }
     }
 
@@ -180,7 +200,7 @@ public class InventoryUI : MonoBehaviour
 
         if (hideWhenUnpossessed && newCharacter == null)
         {
-            HideInventory();
+            HideInventory(); // also applies body outline closed position
         }
     }
 
@@ -328,18 +348,6 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    private void ApplyGridLayoutSettings()
-    {
-        if (!forceGridCellSize || itemSlotsParent == null)
-            return;
-
-        GridLayoutGroup grid = itemSlotsParent.GetComponent<GridLayoutGroup>();
-        if (grid == null)
-            return;
-
-        grid.cellSize = gridCellSize;
-    }
-    
     /// <summary>
     /// Called when an item slot is clicked
     /// </summary>

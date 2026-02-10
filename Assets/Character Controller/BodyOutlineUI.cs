@@ -40,6 +40,16 @@ public class BodyOutlineUI : MonoBehaviour
     [Tooltip("Fade out speed when deactivating")]
     public float fadeOutSpeed = 3f;
 
+    [Header("Damage-based visibility")]
+    [Tooltip("Body outline fades in when you take damage and fades out after no damage for this many seconds.")]
+    public float fadeOutAfterNoDamageSeconds = 3f;
+
+    [Header("On take control")]
+    [Tooltip("When you take control of a unit, outline fades in to show condition, then fades out after this many seconds.")]
+    public float showOutlineAfterControlSeconds = 3f;
+
+    [Tooltip("Optional: reference to InventoryUI. If set, outline is fully visible (no fade) while inventory is open.")]
+    public InventoryUI inventoryUI;
 
     // Dictionary to map limb types to UI images
     private Dictionary<ProceduralCharacterController.LimbType, Image> limbImages = 
@@ -50,6 +60,19 @@ public class BodyOutlineUI : MonoBehaviour
     
     // Track previous attachment state to avoid unnecessary updates
     private bool wasAttached = false;
+
+    // Damage-based visibility: time when damage was last taken
+    private float lastDamageTime = -999f;
+    private Dictionary<ProceduralCharacterController.LimbType, float> previousLimbHealth = new Dictionary<ProceduralCharacterController.LimbType, float>();
+    private float previousTorsoHealth = -1f;
+
+    // When we took control of current unit (for fade-in then fade-out)
+    private float controlTakenTime = -999f;
+
+    // Current smoothed alpha used for fading (so we can apply to all parts even without CanvasGroup)
+    private float currentFadeAlpha = 0f;
+
+    private bool wasInventoryOpen;
 
     private void Awake()
     {
@@ -69,11 +92,9 @@ public class BodyOutlineUI : MonoBehaviour
         // Try to find character controller if not assigned
         TryFindCharacterController();
 
-        // Ensure canvas group starts hidden
+        currentFadeAlpha = 0f;
         if (canvasGroup != null)
-        {
             canvasGroup.alpha = 0f;
-        }
         
         // Start with canvas disabled if not attached
         if (canvas != null)
@@ -87,15 +108,22 @@ public class BodyOutlineUI : MonoBehaviour
     {
         // Try to find character controller again in Start (in case it's created after Awake)
         TryFindCharacterController();
-        
+        if (inventoryUI == null)
+            inventoryUI = FindFirstObjectByType<InventoryUI>();
         // Subscribe to limb health change events and overall health changes (for Torso)
         if (characterController != null)
         {
             characterController.OnLimbHealthChanged += OnLimbHealthChanged;
             characterController.OnHealthChanged += OnCharacterHealthChanged;
             subscribedController = characterController;
-            
-            // Initialize UI with current health values
+            controlTakenTime = Time.time;
+            previousTorsoHealth = characterController.GetTorsoHealth();
+            foreach (ProceduralCharacterController.LimbType limbType in System.Enum.GetValues(typeof(ProceduralCharacterController.LimbType)))
+            {
+                ProceduralLimb limb = characterController.GetLimb(limbType);
+                if (limb != null)
+                    previousLimbHealth[limbType] = limb.GetCurrentHealth();
+            }
             UpdateAllLimbUI();
         }
     }
@@ -172,11 +200,18 @@ public class BodyOutlineUI : MonoBehaviour
         {
             characterController.OnLimbHealthChanged += OnLimbHealthChanged;
             characterController.OnHealthChanged += OnCharacterHealthChanged;
-            // Update all UI immediately
+            controlTakenTime = Time.time;
+            previousTorsoHealth = characterController.GetTorsoHealth();
+            previousLimbHealth.Clear();
+            foreach (ProceduralCharacterController.LimbType limbType in System.Enum.GetValues(typeof(ProceduralCharacterController.LimbType)))
+            {
+                ProceduralLimb limb = characterController.GetLimb(limbType);
+                if (limb != null)
+                    previousLimbHealth[limbType] = limb.GetCurrentHealth();
+            }
             UpdateAllLimbUI();
         }
         
-        // Update attachment state
         wasAttached = false;
     }
 
@@ -317,11 +352,13 @@ public class BodyOutlineUI : MonoBehaviour
     // Handle limb health change events
     private void OnLimbHealthChanged(ProceduralCharacterController.LimbType limbType, float current, float max)
     {
+        // Detect damage: health decreased from previous value
+        if (previousLimbHealth.TryGetValue(limbType, out float prev) && current < prev)
+            lastDamageTime = Time.time;
+        previousLimbHealth[limbType] = current;
         // Update the UI for the changed limb
         UpdateLimbUI(limbType, current, max);
-        
         // Also update Torso UI since overall health changes when any limb health changes
-        // This ensures Torso UI updates immediately without waiting for OnHealthChanged event
         if (characterController != null && limbType != ProceduralCharacterController.LimbType.Torso)
         {
             float torsoCurrent = characterController.GetTorsoHealth();
@@ -336,11 +373,13 @@ public class BodyOutlineUI : MonoBehaviour
         // #region agent log
         try { File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", $"{{\"id\":\"log_{System.DateTime.Now.Ticks}\",\"timestamp\":{System.DateTimeOffset.Now.ToUnixTimeMilliseconds()},\"location\":\"BodyOutlineUI.cs:325\",\"message\":\"OnCharacterHealthChanged called\",\"data\":{{\"current\":{current},\"max\":{max},\"characterController\":{(characterController != null ? "exists" : "null")}}},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"H\"}}\n"); } catch { }
         // #endregion
-        // Update Torso UI when overall character health changes (but use torso-specific health, not overall)
         if (characterController != null)
         {
             float torsoCurrent = characterController.GetTorsoHealth();
             float torsoMax = characterController.GetTorsoMaxHealth();
+            if (previousTorsoHealth >= 0f && torsoCurrent < previousTorsoHealth)
+                lastDamageTime = Time.time;
+            previousTorsoHealth = torsoCurrent;
             UpdateLimbUI(ProceduralCharacterController.LimbType.Torso, torsoCurrent, torsoMax);
         }
     }
@@ -486,7 +525,15 @@ public class BodyOutlineUI : MonoBehaviour
                 characterController.OnLimbHealthChanged += OnLimbHealthChanged;
                 characterController.OnHealthChanged += OnCharacterHealthChanged;
                 subscribedController = characterController;
-                // Update all UI immediately when switching
+                controlTakenTime = Time.time;
+                previousTorsoHealth = characterController.GetTorsoHealth();
+                previousLimbHealth.Clear();
+                foreach (ProceduralCharacterController.LimbType limbType in System.Enum.GetValues(typeof(ProceduralCharacterController.LimbType)))
+                {
+                    ProceduralLimb limb = characterController.GetLimb(limbType);
+                    if (limb != null)
+                        previousLimbHealth[limbType] = limb.GetCurrentHealth();
+                }
                 UpdateAllLimbUI();
             }
         }
@@ -507,27 +554,40 @@ public class BodyOutlineUI : MonoBehaviour
                 characterController.OnLimbHealthChanged += OnLimbHealthChanged;
                 characterController.OnHealthChanged += OnCharacterHealthChanged;
                 subscribedController = characterController;
+                controlTakenTime = Time.time;
+                previousTorsoHealth = characterController.GetTorsoHealth();
+                previousLimbHealth.Clear();
+                foreach (ProceduralCharacterController.LimbType limbType in System.Enum.GetValues(typeof(ProceduralCharacterController.LimbType)))
+                {
+                    ProceduralLimb limb = characterController.GetLimb(limbType);
+                    if (limb != null)
+                        previousLimbHealth[limbType] = limb.GetCurrentHealth();
+                }
                 UpdateAllLimbUI();
             }
         }
         
         // Determine if canvas should be enabled based on attachment
-        // Canvas should only be enabled when we have a character controller AND it's not in spectator mode
         bool isAttached = characterController != null && !characterController.spectatorMode;
-        
-        // Always update canvas state based on attachment (enable/disable as needed)
         if (canvas != null)
         {
-            // Enable canvas only when attached to a controlled character
             canvas.enabled = isAttached;
             wasAttached = isAttached;
         }
         
-        // Set target alpha based on visibility (for fade effects)
-        if (characterController != null)
+        // Target alpha: inventory = instant full (no fade). Else show after taking control, or after recent damage; otherwise fade out.
+        bool inventoryOpen = inventoryUI != null && inventoryUI.inventoryPanel != null && inventoryUI.inventoryPanel.activeSelf;
+        if (inventoryOpen)
         {
-            bool shouldBeVisible = !characterController.spectatorMode;
-        targetAlpha = shouldBeVisible ? 1f : 0f;
+            targetAlpha = 1f;
+        }
+        else if (characterController != null && !characterController.spectatorMode)
+        {
+            float timeSinceControl = Time.time - controlTakenTime;
+            float timeSinceLastDamage = Time.time - lastDamageTime;
+            bool showingAfterControl = timeSinceControl < showOutlineAfterControlSeconds;
+            bool recentDamage = timeSinceLastDamage < fadeOutAfterNoDamageSeconds;
+            targetAlpha = (showingAfterControl || recentDamage) ? 1f : 0f;
         }
         else
         {
@@ -535,21 +595,42 @@ public class BodyOutlineUI : MonoBehaviour
         }
     }
 
-    // Smoothly fade the canvas group
+    // Smoothly fade all parts: canvas group (if set) and every Graphic under this object.
+    // When inventory is open, show at full opacity; when closing inventory, snap to target (no fade out).
     private void UpdateCanvasFade()
     {
-        if (canvasGroup == null)
-            return;
+        bool inventoryOpen = inventoryUI != null && inventoryUI.inventoryPanel != null && inventoryUI.inventoryPanel.activeSelf;
+        if (inventoryOpen)
+        {
+            currentFadeAlpha = 1f;
+        }
+        else if (wasInventoryOpen)
+        {
+            // Just closed inventory: snap to target so outline doesn't fade out
+            currentFadeAlpha = targetAlpha;
+        }
+        else
+        {
+            float fadeSpeed = targetAlpha > currentFadeAlpha ? fadeInSpeed : fadeOutSpeed;
+            currentFadeAlpha = Mathf.Lerp(currentFadeAlpha, targetAlpha, Time.deltaTime * fadeSpeed);
+        }
+        wasInventoryOpen = inventoryOpen;
 
-        // Determine fade speed based on direction
-        float fadeSpeed = targetAlpha > canvasGroup.alpha ? fadeInSpeed : fadeOutSpeed;
-        
-        // Smoothly interpolate alpha
-        canvasGroup.alpha = Mathf.Lerp(canvasGroup.alpha, targetAlpha, Time.deltaTime * fadeSpeed);
-        
-        // Enable/disable interactability and blocking based on visibility
-        bool isVisible = canvasGroup.alpha > 0.01f;
-        canvasGroup.interactable = isVisible;
-        canvasGroup.blocksRaycasts = isVisible;
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = currentFadeAlpha;
+            bool isVisible = currentFadeAlpha > 0.01f;
+            canvasGroup.interactable = isVisible;
+            canvasGroup.blocksRaycasts = isVisible;
+        }
+
+        // Apply the same fade alpha to every Graphic (Image, RawImage, Text, etc.) under this object
+        Graphic[] graphics = GetComponentsInChildren<Graphic>(true);
+        foreach (Graphic g in graphics)
+        {
+            if (g == null) continue;
+            Color c = g.color;
+            g.color = new Color(c.r, c.g, c.b, currentFadeAlpha);
+        }
     }
 }

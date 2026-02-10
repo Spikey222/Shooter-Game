@@ -154,7 +154,7 @@ public class BleedingController : MonoBehaviour
             bleedAccumulators[t] = 0f;
     }
 
-    private void Update()
+    private void LateUpdate()
     {
         if (characterController == null)
             return;
@@ -205,6 +205,15 @@ public class BleedingController : MonoBehaviour
         return characterController.GetLimbHealthPercentage(limbType);
     }
 
+    private Vector2 GetCharacterWorldPosition()
+    {
+        if (characterController == null)
+            return Vector2.zero;
+        if (characterController.torso != null)
+            return characterController.torso.position;
+        return characterController.transform.position;
+    }
+
     private float GetBleedMultiplierFor(ProceduralCharacterController.LimbType limbType)
     {
         if (limbBleedMultipliers == null)
@@ -219,29 +228,33 @@ public class BleedingController : MonoBehaviour
 
     private Vector2 GetSpawnPositionFor(ProceduralCharacterController.LimbType limbType)
     {
+        // Use Rigidbody2D.position for physics-driven bodies to ensure we always get the current
+        // world position as the character moves. transform.position can lag behind when reading
+        // from Update; Rigidbody2D.position is the authoritative physics position.
         Vector2 limbPos;
         Vector2 feetPos;
-        Vector2 characterWorldPos = (Vector2)characterController.transform.position;
+        Vector2 characterWorldPos = GetCharacterWorldPosition();
 
         if (limbType == ProceduralCharacterController.LimbType.Torso)
         {
-            if (characterController.torso != null)
-                limbPos = characterController.torso.transform.position;
-            else
-                limbPos = characterWorldPos;
+            limbPos = characterController.torso != null
+                ? characterController.torso.position
+                : characterWorldPos;
             feetPos = limbPos;
         }
         else
         {
             ProceduralLimb limb = characterController.GetLimb(limbType);
             if (limb != null)
-                limbPos = limb.transform.position;
+            {
+                var limbRb = limb.GetComponent<Rigidbody2D>();
+                limbPos = limbRb != null ? limbRb.position : (Vector2)limb.transform.position;
+            }
             else
                 limbPos = characterWorldPos;
-            if (characterController.torso != null)
-                feetPos = characterController.torso.transform.position;
-            else
-                feetPos = characterWorldPos;
+            feetPos = characterController.torso != null
+                ? characterController.torso.position
+                : characterWorldPos;
         }
 
         Vector2 pos;
