@@ -82,6 +82,14 @@ public class BleedingController : MonoBehaviour
     [Tooltip("Parent transform for spawned blood (keeps hierarchy clean). Leave empty for scene root.")]
     public Transform bloodParent;
 
+    [Header("Bleed Status (for UI)")]
+    [Tooltip("Intensity above this = Light bleeding (for body part info display)")]
+    [Range(0f, 2f)]
+    public float lightBleedThreshold = 0.1f;
+    [Tooltip("Intensity above this = Heavy bleeding (for body part info display)")]
+    [Range(0f, 2f)]
+    public float heavyBleedThreshold = 0.5f;
+
     private ProceduralCharacterController characterController;
     private Dictionary<ProceduralCharacterController.LimbType, float> bleedAccumulators = new Dictionary<ProceduralCharacterController.LimbType, float>();
     private float bleedDoTTimer;
@@ -224,6 +232,19 @@ public class BleedingController : MonoBehaviour
                 return s.bleedMultiplier;
         }
         return 1f;
+    }
+
+    /// <summary>
+    /// Returns normalized bleed intensity for a limb (0 = none, higher = more severe).
+    /// Use lightBleedThreshold and heavyBleedThreshold to classify as Light/Heavy for UI display.
+    /// </summary>
+    public float GetBleedIntensityFor(ProceduralCharacterController.LimbType limbType)
+    {
+        if (characterController == null) return 0f;
+        float healthPercent = GetHealthPercentFor(limbType);
+        float multiplier = GetBleedMultiplierFor(limbType);
+        float intensity = (1f - healthPercent) * multiplier * baseBleedRate;
+        return intensity;
     }
 
     private Vector2 GetSpawnPositionFor(ProceduralCharacterController.LimbType limbType)

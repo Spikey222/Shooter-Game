@@ -331,22 +331,40 @@ public class BodyOutlineUI : MonoBehaviour
         // #endregion
     }
     
-    // Convert LimbType enum name to expected Image GameObject name
-    private string ConvertLimbTypeToImageName(string enumName)
+    /// <summary>
+    /// Returns the limb-to-image mapping for use by BodyPartHoverHandler (click-to-select body parts).
+    /// </summary>
+    public Dictionary<ProceduralCharacterController.LimbType, Image> GetLimbImageMap()
     {
-        // Add spaces before capital letters (except first letter)
-        // RightBicep -> "Right Bicep"
-        // RightForearm -> "Right Forearm"
+        return limbImages;
+    }
+
+    /// <summary>
+    /// Returns display name for a limb type (e.g. "Left Forearm", "Chest" for Torso).
+    /// </summary>
+    public static string GetLimbDisplayName(ProceduralCharacterController.LimbType limbType)
+    {
+        if (limbType == ProceduralCharacterController.LimbType.Torso)
+            return "Chest";
+        return ConvertLimbTypeToImageNameStatic(limbType.ToString());
+    }
+
+    private static string ConvertLimbTypeToImageNameStatic(string enumName)
+    {
         System.Text.StringBuilder sb = new System.Text.StringBuilder();
         for (int i = 0; i < enumName.Length; i++)
         {
             if (i > 0 && char.IsUpper(enumName[i]))
-            {
                 sb.Append(' ');
-            }
             sb.Append(enumName[i]);
         }
         return sb.ToString();
+    }
+
+    // Convert LimbType enum name to expected Image GameObject name
+    private string ConvertLimbTypeToImageName(string enumName)
+    {
+        return ConvertLimbTypeToImageNameStatic(enumName);
     }
 
     // Handle limb health change events
@@ -632,5 +650,13 @@ public class BodyOutlineUI : MonoBehaviour
             Color c = g.color;
             g.color = new Color(c.r, c.g, c.b, currentFadeAlpha);
         }
+    }
+
+    /// <summary>
+    /// Current fade alpha applied to limb graphics. Used by BodyPartHoverHandler for pulsating highlight.
+    /// </summary>
+    public float GetCurrentFadeAlpha()
+    {
+        return currentFadeAlpha;
     }
 }
