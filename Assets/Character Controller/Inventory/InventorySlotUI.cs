@@ -39,6 +39,17 @@ public class InventorySlotUI : MonoBehaviour
     private InventoryItem inventoryItem;
     private int slotIndex;
     private InventoryUI parentUI;
+    private bool pendingHealableActive;
+
+    [Header("Pending healable (bandage) pulse")]
+    [Tooltip("Pulse speed for the indicator when bandage/limb-target mode is active (lower = slower)")]
+    public float pendingPulseSpeed = 1.2f;
+
+    [Header("Cooldown (delay timer)")]
+    [Tooltip("Radial 360 image for the delay timer: fills in sync with Use Time after each use. Assign here or add a child of Equipped Indicator named 'CooldownRadial' with an Image (Filled, Radial 360).")]
+    public Image cooldownImage;
+    private float cooldownRemaining;
+    private float cooldownDuration;
 
     private bool DebugEnabled => parentUI != null && parentUI.enableDebugLogs;
 
@@ -56,6 +67,32 @@ public class InventorySlotUI : MonoBehaviour
             {
                 equippedIndicator = t.gameObject;
                 break;
+            }
+        }
+    }
+
+    private void EnsureCooldownRadialImage()
+    {
+        if (cooldownImage != null)
+        {
+            cooldownImage.type = Image.Type.Filled;
+            cooldownImage.fillMethod = Image.FillMethod.Radial360;
+            cooldownImage.fillOrigin = (int)Image.Origin360.Right;
+            cooldownImage.fillClockwise = true;
+            return;
+        }
+        if (equippedIndicator == null)
+            return;
+        Transform cooldownT = equippedIndicator.transform.Find("CooldownRadial");
+        if (cooldownT != null)
+        {
+            cooldownImage = cooldownT.GetComponent<Image>();
+            if (cooldownImage != null)
+            {
+                cooldownImage.type = Image.Type.Filled;
+                cooldownImage.fillMethod = Image.FillMethod.Radial360;
+                cooldownImage.fillOrigin = (int)Image.Origin360.Right;
+                cooldownImage.fillClockwise = true;
             }
         }
     }
@@ -134,6 +171,7 @@ public class InventorySlotUI : MonoBehaviour
         AutoWireDisplayReferencesIfNeeded();
         AutoWireButtonsIfNeeded();
         AutoWireEquippedIndicatorIfNeeded();
+        EnsureCooldownRadialImage();
         
         UpdateDisplay();
         
@@ -141,7 +179,7 @@ public class InventorySlotUI : MonoBehaviour
         if (slotButton != null)
         {
             slotButton.onClick.RemoveAllListeners();
-            slotButton.onClick.AddListener(() => parentUI.OnItemSlotClicked(slotIndex));
+            slotButton.onClick.AddListener(OnSlotButtonClicked);
         }
         else if (DebugEnabled)
         {
@@ -151,7 +189,7 @@ public class InventorySlotUI : MonoBehaviour
         if (useButton != null)
         {
             useButton.onClick.RemoveAllListeners();
-            useButton.onClick.AddListener(() => parentUI.OnItemSlotUseClicked(slotIndex));
+            useButton.onClick.AddListener(OnUseButtonClicked);
         }
         
         if (dropButton != null)
@@ -219,25 +257,37 @@ public class InventorySlotUI : MonoBehaviour
             weightText.gameObject.SetActive(true);
         }
 
-        // Equipped indicator (for clothing and weapons)
+        // Equipped indicator (for clothing and weapons), or pulsating indicator when bandage/limb-target mode is active
         if (equippedIndicator != null)
         {
             bool isEquipped = false;
+            pendingHealableActive = false;
 
             if (item.itemType == Item.ItemType.Clothing && parentUI != null && parentUI.character != null && parentUI.character.clothingController != null)
             {
-                // Show indicator for any clothing item currently equipped (overlay or ReplaceSprite).
                 isEquipped = parentUI.character.clothingController.IsEquipped(item);
             }
             else if (item.itemType == Item.ItemType.Weapon && parentUI != null && parentUI.character != null)
             {
-                // Show indicator for any weapon currently equipped
                 isEquipped = parentUI.character.IsEquipped(item);
             }
+            else if (item.itemType == Item.ItemType.Consumable && parentUI != null && parentUI.IsSlotPendingHealable(slotIndex))
+            {
+                pendingHealableActive = true;
+            }
 
-            equippedIndicator.SetActive(isEquipped);
+            equippedIndicator.SetActive(isEquipped || pendingHealableActive);
         }
         
+        // Cooldown radial: show for consumables with Use Time (delay), hide otherwise
+        if (cooldownImage != null)
+        {
+            bool showCooldown = item is ConsumableItem cons && cons.useTime > 0f;
+            cooldownImage.gameObject.SetActive(showCooldown);
+            if (showCooldown && cooldownRemaining <= 0f)
+                cooldownImage.fillAmount = 1f;
+        }
+
         // Show/hide use button based on item type
         if (useButton != null)
         {
@@ -256,6 +306,105 @@ public class InventorySlotUI : MonoBehaviour
     // NOTE: We previously only showed the indicator for overlay accessories.
     // Now we show it for any equipped clothing item, including ReplaceSprite shirts.
     
+    private void Update()
+    {
+        // Cooldown timer / radial fill
+        if (cooldownRemaining > 0f)
+        {
+            cooldownRemaining -= Time.deltaTime;
+            if (cooldownRemaining < 0f)
+                cooldownRemaining = 0f;
+
+            if (cooldownImage != null && cooldownDuration > 0f)
+            {
+                // 0 -> 1 as the item becomes ready again
+                float t = 1f - (cooldownRemaining / cooldownDuration);
+                cooldownImage.fillAmount = Mathf.Clamp01(t);
+            }
+        }
+        else if (cooldownImage != null && cooldownDuration > 0f)
+        {
+            cooldownImage.fillAmount = 1f;
+        }
+
+        // Pending-healable indicator alpha pulse (transparency)
+        if (equippedIndicator == null)
+            return;
+
+        var indicatorImage = equippedIndicator.GetComponent<Image>();
+        if (indicatorImage == null)
+            return;
+
+        if (pendingHealableActive && equippedIndicator.activeSelf)
+        {
+            // Pulse alpha between 40% and 100%
+            float t = 0.5f + 0.5f * Mathf.Sin(Time.time * pendingPulseSpeed * Mathf.PI * 2f);
+            float alpha = Mathf.Lerp(0.4f, 1f, t);
+            Color c = indicatorImage.color;
+            c.a = alpha;
+            indicatorImage.color = c;
+        }
+        else
+        {
+            Color c = indicatorImage.color;
+            c.a = 1f;
+            indicatorImage.color = c;
+        }
+    }
+
+    /// <summary>
+    /// Start a cooldown for this slot (delay in seconds). Radial 360 image fills from 0 to 1 in sync; when full, item can be used again.
+    /// </summary>
+    public void StartCooldown(float duration)
+    {
+        if (duration <= 0f)
+            return;
+        cooldownDuration = duration;
+        cooldownRemaining = duration;
+        if (cooldownImage != null)
+            cooldownImage.fillAmount = 0f;
+    }
+
+    /// <summary>
+    /// Apply remaining cooldown after UI rebuild so the delay timer and radial persist.
+    /// </summary>
+    public void StartCooldownWithRemaining(float remaining, float fullDuration)
+    {
+        if (fullDuration <= 0f)
+            return;
+        cooldownDuration = fullDuration;
+        cooldownRemaining = Mathf.Max(0f, remaining);
+        if (cooldownImage != null)
+            cooldownImage.fillAmount = 1f - Mathf.Clamp01(cooldownRemaining / fullDuration);
+    }
+
+    public bool IsOnCooldown()
+    {
+        return cooldownRemaining > 0f;
+    }
+
+    private void OnSlotButtonClicked()
+    {
+        if (inventoryItem == null || inventoryItem.IsEmpty())
+            return;
+
+        if (inventoryItem.item is ConsumableItem consumable && consumable.useTime > 0f && IsOnCooldown())
+            return;
+
+        parentUI?.OnItemSlotClicked(slotIndex);
+    }
+
+    private void OnUseButtonClicked()
+    {
+        if (inventoryItem == null || inventoryItem.IsEmpty())
+            return;
+
+        if (inventoryItem.item is ConsumableItem consumable && consumable.useTime > 0f && IsOnCooldown())
+            return;
+
+        parentUI?.OnItemSlotUseClicked(slotIndex);
+    }
+
     /// <summary>
     /// Set the slot as selected/highlighted
     /// </summary>

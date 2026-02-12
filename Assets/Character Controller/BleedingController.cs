@@ -56,6 +56,16 @@ public class BleedingController : MonoBehaviour
     [Tooltip("Min/max scale for spawned blood (random in range)")]
     public Vector2 bloodScaleRange = new Vector2(0.8f, 1.2f);
 
+    [Header("Blood Pooling")]
+    [Tooltip("If true, new blood within this radius of an existing pool merges into it (dominant sprite scales up).")]
+    public bool mergeBloodPools = true;
+    [Tooltip("Base distance within which a new drop will merge into an existing blood pool. Actual radius scales up with pool size.")]
+    [Range(0.05f, 1f)]
+    public float bloodMergeRadius = 0.25f;
+    [Tooltip("Maximum size blood pools can grow to when merging.")]
+    [Range(1f, 25f)]
+    public float bloodPoolMaxScale = 10f;
+
     [Header("Sorting")]
     [Tooltip("Sorting layer name for blood when not using character reference (e.g. Default or Ground)")]
     public string bloodSortingLayerName = "Default";
@@ -247,6 +257,15 @@ public class BleedingController : MonoBehaviour
         return intensity;
     }
 
+    /// <summary>
+    /// Stop bleeding on a specific limb (e.g. when a bandage is applied). Resets the bleed accumulator so no blood spawns until intensity is recomputed.
+    /// </summary>
+    public void StopBleeding(ProceduralCharacterController.LimbType limbType)
+    {
+        if (bleedAccumulators.ContainsKey(limbType))
+            bleedAccumulators[limbType] = 0f;
+    }
+
     private Vector2 GetSpawnPositionFor(ProceduralCharacterController.LimbType limbType)
     {
         // Use Rigidbody2D.position for physics-driven bodies to ensure we always get the current
@@ -300,7 +319,18 @@ public class BleedingController : MonoBehaviour
 
     private void SpawnBlood(Vector2 worldPosition, ProceduralCharacterController.LimbType source)
     {
+        float scaleToAdd = UnityEngine.Random.Range(bloodScaleRange.x, bloodScaleRange.y);
         Vector3 worldPos = new Vector3(worldPosition.x, worldPosition.y, 0f);
+
+        if (mergeBloodPools && bloodMergeRadius > 0f)
+        {
+            BloodPool existing = BloodPool.FindNearestPool(worldPosition, bloodMergeRadius);
+            if (existing != null)
+            {
+                existing.AddBlood(scaleToAdd);
+                return;
+            }
+        }
 
         if (bloodPrefab != null)
         {
@@ -308,9 +338,9 @@ public class BleedingController : MonoBehaviour
             GameObject go = Instantiate(bloodPrefab, worldPos, rot, bloodParent);
             go.transform.position = worldPos;
             go.transform.rotation = rot;
-            float scale = UnityEngine.Random.Range(bloodScaleRange.x, bloodScaleRange.y);
-            go.transform.localScale = new Vector3(scale, scale, 1f);
+            go.transform.localScale = new Vector3(scaleToAdd, scaleToAdd, 1f);
 
+            EnsureBloodPoolComponent(go);
             ApplyBloodSorting(go);
             return;
         }
@@ -326,12 +356,22 @@ public class BleedingController : MonoBehaviour
         bloodGo.transform.position = worldPos;
         bloodGo.transform.SetParent(bloodParent, true);
         bloodGo.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
-        float s = UnityEngine.Random.Range(bloodScaleRange.x, bloodScaleRange.y);
-        bloodGo.transform.localScale = new Vector3(s, s, 1f);
+        bloodGo.transform.localScale = new Vector3(scaleToAdd, scaleToAdd, 1f);
 
         SpriteRenderer renderer = bloodGo.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
+        EnsureBloodPoolComponent(bloodGo);
         ApplyBloodSorting(bloodGo);
+    }
+
+    private void EnsureBloodPoolComponent(GameObject bloodObject)
+    {
+        BloodPool pool = bloodObject.GetComponent<BloodPool>();
+        if (pool == null)
+            pool = bloodObject.AddComponent<BloodPool>();
+
+        // Let the controller define how big pools are allowed to get.
+        pool.maxScale = bloodPoolMaxScale;
     }
 
     private void ApplyBloodSorting(GameObject bloodObject)

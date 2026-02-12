@@ -58,6 +58,21 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("If true, inventory UI auto-hides when you unpossess.")]
     public bool hideWhenUnpossessed = true;
 
+    [Header("Audio")]
+    [Tooltip("Sound played when inventory opens (optional)")]
+    public AudioClip openSound;
+    [Tooltip("Sound played when inventory closes (optional)")]
+    public AudioClip closeSound;
+    [Tooltip("Volume for open/close sounds")]
+    [Range(0f, 1f)]
+    public float audioVolume = 1f;
+
+    [Header("Consumable Audio")]
+    [Tooltip("Sound played when a consumable is successfully used (including bandages).")]
+    public AudioClip consumableUseSound;
+    [Range(0f, 1f)]
+    public float consumableUseVolume = 1f;
+
     [Header("Body Outline Position")]
     [Tooltip("Assign BodyOutline > Outline RectTransform here. It will move when inventory opens/closes.")]
     public RectTransform bodyOutlineOutline;
@@ -70,6 +85,15 @@ public class InventoryUI : MonoBehaviour
 
     private Inventory inventory;
     private List<InventorySlotUI> itemSlots = new List<InventorySlotUI>();
+    private AudioSource audioSource;
+    private int pendingHealableSlotIndex = -1;
+    private Dictionary<Item, float> itemCooldownEndTime = new Dictionary<Item, float>();
+    private Dictionary<Item, float> itemCooldownDuration = new Dictionary<Item, float>();
+
+    /// <summary>
+    /// True when the inventory panel is open. Used to block mouse aim and attack on the controlled character.
+    /// </summary>
+    public static bool IsInventoryOpen { get; private set; }
     
     private void Start()
     {
@@ -96,18 +120,38 @@ public class InventoryUI : MonoBehaviour
             SetCharacter(character);
         }
         
+        // Get or add AudioSource for inventory sounds
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null && (openSound != null || closeSound != null))
+            audioSource = gameObject.AddComponent<AudioSource>();
+
         // Initialize UI visibility
         if (inventoryPanel != null)
         {
             bool shouldShow = startVisible;
             if (!allowOpenWhenUnpossessed && character == null)
                 shouldShow = false;
-            inventoryPanel.SetActive(shouldShow);
-            ApplyBodyOutlinePosition(shouldShow);
+            SetInventoryPanelState(shouldShow, playSound: false);
         }
         
         // Initial UI update
         UpdateUI();
+    }
+
+    private void SetInventoryPanelState(bool open, bool playSound = true)
+    {
+        if (inventoryPanel == null) return;
+        inventoryPanel.SetActive(open);
+        IsInventoryOpen = open;
+        if (!open)
+            pendingHealableSlotIndex = -1;
+        ApplyBodyOutlinePosition(open);
+        if (playSound && audioSource != null)
+        {
+            var clip = open ? openSound : closeSound;
+            if (clip != null)
+                audioSource.PlayOneShot(clip, audioVolume);
+        }
     }
 
     private void ApplyBodyOutlinePosition(bool inventoryOpen)
@@ -152,8 +196,7 @@ public class InventoryUI : MonoBehaviour
             }
 
             bool newState = !inventoryPanel.activeSelf;
-            inventoryPanel.SetActive(newState);
-            ApplyBodyOutlinePosition(newState);
+            SetInventoryPanelState(newState);
             if (newState)
             {
                 UpdateUI();
@@ -171,8 +214,7 @@ public class InventoryUI : MonoBehaviour
             if (!allowOpenWhenUnpossessed && character == null)
                 return;
 
-            inventoryPanel.SetActive(true);
-            ApplyBodyOutlinePosition(true);
+            SetInventoryPanelState(true);
             UpdateUI();
         }
     }
@@ -180,12 +222,12 @@ public class InventoryUI : MonoBehaviour
     /// <summary>
     /// Hide inventory panel
     /// </summary>
-    public void HideInventory()
+    /// <param name="playSound">If true, plays close sound (use false for programmatic hide e.g. on unpossess)</param>
+    public void HideInventory(bool playSound = true)
     {
         if (inventoryPanel != null)
         {
-            inventoryPanel.SetActive(false);
-            ApplyBodyOutlinePosition(false);
+            SetInventoryPanelState(false, playSound);
         }
     }
 
@@ -200,7 +242,7 @@ public class InventoryUI : MonoBehaviour
 
         if (hideWhenUnpossessed && newCharacter == null)
         {
-            HideInventory(); // also applies body outline closed position
+            HideInventory(playSound: false); // programmatic hide on unpossess
         }
     }
 
@@ -301,6 +343,20 @@ public class InventoryUI : MonoBehaviour
         // Initialize slot
         slotUI.Initialize(invItem, slotIndex, this);
         itemSlots.Add(slotUI);
+
+        // Re-apply cooldown after rebuild so delay timer and radial survive UpdateUI
+        Item item = invItem.item;
+        if (itemCooldownEndTime.TryGetValue(item, out float endTime) && itemCooldownDuration.TryGetValue(item, out float dur))
+        {
+            float rem = endTime - Time.time;
+            if (rem <= 0f)
+            {
+                itemCooldownEndTime.Remove(item);
+                itemCooldownDuration.Remove(item);
+            }
+            else
+                slotUI.StartCooldownWithRemaining(rem, dur);
+        }
     }
     
     /// <summary>
@@ -382,11 +438,32 @@ public class InventoryUI : MonoBehaviour
             character.EquipItemFromInventory(slotIndex);
             UpdateUI();
         }
-        // If it's a consumable, use it
+        // If it's a consumable, use it or enter limb-target mode
         else if (invItem.item.itemType == Item.ItemType.Consumable)
         {
-            character.UseConsumable(invItem.item, 1);
-            UpdateUI();
+            if (invItem.item is ConsumableItem consumable && consumable.requiresLimbTarget)
+            {
+                if (pendingHealableSlotIndex == slotIndex)
+                {
+                    pendingHealableSlotIndex = -1;
+                }
+                else
+                {
+                    pendingHealableSlotIndex = slotIndex;
+                }
+                UpdateUI();
+            }
+            else
+            {
+                bool used = character.UseConsumable(invItem.item, 1);
+                if (used)
+                {
+                    PlayConsumableUseSound();
+                    if (invItem.item is ConsumableItem c && c.useTime > 0f)
+                        StartCooldownForSlot(slotIndex, c.useTime);
+                }
+                UpdateUI();
+            }
         }
         // If it's clothing, equip it as an overlay
         else if (invItem.item.itemType == Item.ItemType.Clothing)
@@ -419,8 +496,106 @@ public class InventoryUI : MonoBehaviour
         
         if (invItem.item.itemType == Item.ItemType.Consumable)
         {
-            character.UseConsumable(invItem.item, 1);
-            UpdateUI();
+            if (invItem.item is ConsumableItem consumable && consumable.requiresLimbTarget)
+            {
+                if (pendingHealableSlotIndex == slotIndex)
+                    pendingHealableSlotIndex = -1;
+                else
+                    pendingHealableSlotIndex = slotIndex;
+                UpdateUI();
+            }
+            else
+            {
+                bool used = character.UseConsumable(invItem.item, 1);
+                if (used)
+                {
+                    PlayConsumableUseSound();
+                    if (invItem.item is ConsumableItem c && c.useTime > 0f)
+                        StartCooldownForSlot(slotIndex, c.useTime);
+                }
+                UpdateUI();
+            }
+        }
+    }
+    
+    /// <summary>
+    /// True when a consumable that requires a limb target is selected and waiting for the user to click a body part.
+    /// </summary>
+    public bool HasPendingHealable()
+    {
+        if (pendingHealableSlotIndex < 0 || inventory == null || character == null)
+            return false;
+        InventoryItem invItem = inventory.GetItemAt(pendingHealableSlotIndex);
+        if (invItem == null || invItem.IsEmpty() || invItem.item.itemType != Item.ItemType.Consumable)
+            return false;
+        if (invItem.item is not ConsumableItem consumable || !consumable.requiresLimbTarget)
+            return false;
+        return true;
+    }
+    
+    /// <summary>
+    /// Apply the pending healable consumable to the given limb. Returns true if applied and one item was consumed.
+    /// Bandage mode stays active so the user can apply to more limbs without re-clicking the item; cleared when the slot is empty or user cancels.
+    /// </summary>
+    public bool TryApplyPendingHealableToLimb(ProceduralCharacterController.LimbType limbType)
+    {
+        if (!HasPendingHealable())
+            return false;
+        InventoryItem invItem = inventory.GetItemAt(pendingHealableSlotIndex);
+        if (invItem == null || invItem.IsEmpty() || invItem.item.itemType != Item.ItemType.Consumable)
+        {
+            pendingHealableSlotIndex = -1;
+            return false;
+        }
+        Item item = invItem.item;
+        bool success = character.UseConsumableOnLimb(item, limbType, 1);
+        if (success)
+        {
+            PlayConsumableUseSound();
+
+            if (item is ConsumableItem consumable && consumable.useTime > 0f)
+                StartCooldownForSlot(pendingHealableSlotIndex, consumable.useTime);
+
+            if (!inventory.HasItem(item, 1))
+                pendingHealableSlotIndex = -1;
+        }
+        else
+            pendingHealableSlotIndex = -1;
+        UpdateUI();
+        return success;
+    }
+
+    /// <summary>
+    /// True when the given slot index is the pending healable (bandage mode active). Used by slot UI for pulsating indicator.
+    /// </summary>
+    public bool IsSlotPendingHealable(int slotIndex)
+    {
+        return pendingHealableSlotIndex >= 0 && pendingHealableSlotIndex == slotIndex;
+    }
+
+    private void PlayConsumableUseSound()
+    {
+        if (audioSource != null && consumableUseSound != null)
+            audioSource.PlayOneShot(consumableUseSound, consumableUseVolume);
+    }
+
+    private void StartCooldownForSlot(int slotIndex, float duration)
+    {
+        if (duration <= 0f)
+            return;
+        if (inventory == null)
+            return;
+        InventoryItem invItem = inventory.GetItemAt(slotIndex);
+        if (invItem == null || invItem.IsEmpty())
+            return;
+        Item item = invItem.item;
+        itemCooldownEndTime[item] = Time.time + duration;
+        itemCooldownDuration[item] = duration;
+        if (slotIndex >= 0 && slotIndex < itemSlots.Count)
+        {
+            var slot = itemSlots[slotIndex];
+            if (slot != null)
+                slot.StartCooldown(duration);
         }
     }
     

@@ -36,13 +36,13 @@ public class BodyPartHoverHandler : MonoBehaviour
     [Header("Selection Highlight")]
     [Tooltip("Pulsating transparency: min alpha (0–1)")]
     [Range(0.3f, 0.9f)]
-    public float pulseMinAlpha = 0.6f;
+    public float pulseMinAlpha = 0.8f;
     [Tooltip("Pulsating transparency: max alpha (0–1)")]
     [Range(0.7f, 1f)]
     public float pulseMaxAlpha = 1f;
-    [Tooltip("Pulsation speed (cycles per second)")]
-    [Range(1f, 4f)]
-    public float pulseSpeed = 2f;
+    [Tooltip("Pulsation speed (cycles per second) – lower = slower, calmer")]
+    [Range(0.3f, 2f)]
+    public float pulseSpeed = 0.4f;
 
     [Header("Condition Thresholds")]
     [Tooltip("Health above this = Excellent")]
@@ -95,6 +95,7 @@ public class BodyPartHoverHandler : MonoBehaviour
     {
         RefreshCharacterReferences();
         UpdateBarSmoothing();
+        UpdateLimbRaycastState();
     }
 
     private void LateUpdate()
@@ -155,8 +156,40 @@ public class BodyPartHoverHandler : MonoBehaviour
 
     public void OnLimbClicked(ProceduralCharacterController.LimbType limbType)
     {
+        if (!IsInventoryOpen()) return;
+        var invUI = bodyOutlineUI != null ? bodyOutlineUI.inventoryUI : null;
+        if (invUI == null) invUI = FindFirstObjectByType<InventoryUI>();
+        if (invUI != null && invUI.HasPendingHealable())
+        {
+            if (invUI.TryApplyPendingHealableToLimb(limbType))
+            {
+                selectedLimb = limbType;
+                UpdateLimbDisplay();
+            }
+            return;
+        }
         selectedLimb = limbType;
         UpdateLimbDisplay();
+    }
+
+    private bool IsInventoryOpen()
+    {
+        var invUI = bodyOutlineUI != null ? bodyOutlineUI.inventoryUI : null;
+        if (invUI == null) invUI = FindFirstObjectByType<InventoryUI>();
+        if (invUI == null || invUI.inventoryPanel == null) return false;
+        return invUI.inventoryPanel.activeSelf;
+    }
+
+    private void UpdateLimbRaycastState()
+    {
+        bool shouldReceiveClicks = IsInventoryOpen();
+        foreach (var kvp in limbClickTargets)
+        {
+            if (kvp.Key != null)
+                kvp.Key.raycastTarget = shouldReceiveClicks;
+        }
+        if (!shouldReceiveClicks && selectedLimb.HasValue)
+            ClearSelection();
     }
 
     public void ClearSelection()

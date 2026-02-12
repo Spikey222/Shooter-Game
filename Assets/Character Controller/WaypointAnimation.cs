@@ -14,7 +14,10 @@ public class WaypointAnimation : MonoBehaviour
     [System.Serializable]
     public class LimbTarget
     {
-        [Tooltip("Which limb to animate (assign in Inspector)")]
+        [Tooltip("Which limb slot to animate (matched by name - works with prefab-spawned weapons, no scene reference needed)")]
+        public ProceduralCharacterController.LimbType limbType = ProceduralCharacterController.LimbType.RightBicep;
+        
+        [Tooltip("Runtime-resolved limb (populated from limbType when equipped; legacy fallback)")]
         public ProceduralLimb targetLimb;
         
         [Tooltip("Target angle for this limb to reach (in degrees)")]
@@ -91,73 +94,101 @@ public class WaypointAnimation : MonoBehaviour
     {
         characterController = controller;
         
-        // CRITICAL FIX: Remap limb references in keyframes to the new character's limbs
-        // This fixes the bug where cloned weapons still reference the original character's limbs
+        // Resolve limb references by matching limb slot/name - works with prefab-spawned weapons (no scene object needed)
         if (controller != null && keyframes != null)
         {
-            RemapLimbReferences(controller);
+            ResolveLimbReferences(controller);
         }
     }
     
     /// <summary>
-    /// Remap all limb references in keyframes to point to the specified character's limbs.
-    /// This is necessary because Unity's Instantiate copies component field references,
-    /// so cloned weapons would still reference the original character's limb GameObjects.
+    /// Map animation limb slot to controller limb slot. Swaps right/left for arms so that
+    /// "Right Bicep/Forearm/Hand" in the Inspector animates the weapon arm (controller's left).
     /// </summary>
-    private void RemapLimbReferences(ProceduralCharacterController newController)
+    private static ProceduralCharacterController.LimbType GetControllerLimbSlotForAnimation(ProceduralCharacterController.LimbType animationLimbType)
+    {
+        switch (animationLimbType)
+        {
+            case ProceduralCharacterController.LimbType.RightBicep:  return ProceduralCharacterController.LimbType.LeftBicep;
+            case ProceduralCharacterController.LimbType.RightForearm: return ProceduralCharacterController.LimbType.LeftForearm;
+            case ProceduralCharacterController.LimbType.RightHand:   return ProceduralCharacterController.LimbType.LeftHand;
+            case ProceduralCharacterController.LimbType.LeftBicep:   return ProceduralCharacterController.LimbType.RightBicep;
+            case ProceduralCharacterController.LimbType.LeftForearm:  return ProceduralCharacterController.LimbType.RightForearm;
+            case ProceduralCharacterController.LimbType.LeftHand:    return ProceduralCharacterController.LimbType.RightHand;
+            default: return animationLimbType;
+        }
+    }
+    
+    /// <summary>
+    /// Resolve all limb references in keyframes using limb slot names.
+    /// Uses limbType to get the correct limb from the character - no scene references needed.
+    /// Prefab-spawned weapons work because we match by known limb names (RightBicep, RightForearm, etc.).
+    /// </summary>
+    private void ResolveLimbReferences(ProceduralCharacterController controller)
     {
         foreach (var keyframe in keyframes)
         {
             if (keyframe.limbTargets == null)
                 continue;
                 
-            for (int i = 0; i < keyframe.limbTargets.Count; i++)
+            foreach (var limbTarget in keyframe.limbTargets)
             {
-                var limbTarget = keyframe.limbTargets[i];
-                if (limbTarget.targetLimb == null)
-                    continue;
+                ProceduralLimb resolvedLimb = null;
                 
-                // Determine which limb this is by checking the old character's limb references
-                // (We need to find which limb this was on the old character to map to the new one)
-                ProceduralCharacterController oldController = limbTarget.targetLimb.GetComponentInParent<ProceduralCharacterController>();
-                if (oldController == null || oldController == newController)
-                    continue; // Already correct or can't determine
-                
-                // Map old limb to new limb
-                ProceduralLimb newLimb = null;
-                if (limbTarget.targetLimb == oldController.rightArm)
-                    newLimb = newController.rightArm;
-                else if (limbTarget.targetLimb == oldController.leftArm)
-                    newLimb = newController.leftArm;
-                else if (limbTarget.targetLimb == oldController.rightForearm)
-                    newLimb = newController.rightForearm;
-                else if (limbTarget.targetLimb == oldController.leftForearm)
-                    newLimb = newController.leftForearm;
-                else if (limbTarget.targetLimb == oldController.rightHand)
-                    newLimb = newController.rightHand;
-                else if (limbTarget.targetLimb == oldController.leftHand)
-                    newLimb = newController.leftHand;
-                else if (limbTarget.targetLimb == oldController.head)
-                    newLimb = newController.head;
-                else if (limbTarget.targetLimb == oldController.neck)
-                    newLimb = newController.neck;
-                else if (limbTarget.targetLimb == oldController.rightThigh)
-                    newLimb = newController.rightThigh;
-                else if (limbTarget.targetLimb == oldController.rightCalf)
-                    newLimb = newController.rightCalf;
-                else if (limbTarget.targetLimb == oldController.rightFoot)
-                    newLimb = newController.rightFoot;
-                else if (limbTarget.targetLimb == oldController.leftThigh)
-                    newLimb = newController.leftThigh;
-                else if (limbTarget.targetLimb == oldController.leftCalf)
-                    newLimb = newController.leftCalf;
-                else if (limbTarget.targetLimb == oldController.leftFoot)
-                    newLimb = newController.leftFoot;
-                
-                // Update the reference
-                if (newLimb != null)
+                // Primary: resolve by limb slot (works with prefab weapons - no scene reference)
+                if (limbTarget.limbType != ProceduralCharacterController.LimbType.Torso)
                 {
-                    limbTarget.targetLimb = newLimb;
+                    // Swap arm slots: in this project the weapon hand is controller's LEFT (visual right = leftHand in hierarchy).
+                    // So "Right Bicep/Forearm/Hand" in the UI should animate the controller's left arm.
+                    ProceduralCharacterController.LimbType slot = GetControllerLimbSlotForAnimation(limbTarget.limbType);
+                    resolvedLimb = controller.GetLimb(slot);
+                }
+                
+                // Fallback: legacy - if we had a direct reference and it belongs to another character, remap it
+                if (resolvedLimb == null && limbTarget.targetLimb != null)
+                {
+                    ProceduralCharacterController oldController = limbTarget.targetLimb.GetComponentInParent<ProceduralCharacterController>();
+                    if (oldController != null && oldController != controller)
+                    {
+                        // Map old limb to new by matching which slot it was
+                        if (limbTarget.targetLimb == oldController.rightArm)
+                            resolvedLimb = controller.rightArm;
+                        else if (limbTarget.targetLimb == oldController.leftArm)
+                            resolvedLimb = controller.leftArm;
+                        else if (limbTarget.targetLimb == oldController.rightForearm)
+                            resolvedLimb = controller.rightForearm;
+                        else if (limbTarget.targetLimb == oldController.leftForearm)
+                            resolvedLimb = controller.leftForearm;
+                        else if (limbTarget.targetLimb == oldController.rightHand)
+                            resolvedLimb = controller.rightHand;
+                        else if (limbTarget.targetLimb == oldController.leftHand)
+                            resolvedLimb = controller.leftHand;
+                        else if (limbTarget.targetLimb == oldController.head)
+                            resolvedLimb = controller.head;
+                        else if (limbTarget.targetLimb == oldController.neck)
+                            resolvedLimb = controller.neck;
+                        else if (limbTarget.targetLimb == oldController.rightThigh)
+                            resolvedLimb = controller.rightThigh;
+                        else if (limbTarget.targetLimb == oldController.rightCalf)
+                            resolvedLimb = controller.rightCalf;
+                        else if (limbTarget.targetLimb == oldController.rightFoot)
+                            resolvedLimb = controller.rightFoot;
+                        else if (limbTarget.targetLimb == oldController.leftThigh)
+                            resolvedLimb = controller.leftThigh;
+                        else if (limbTarget.targetLimb == oldController.leftCalf)
+                            resolvedLimb = controller.leftCalf;
+                        else if (limbTarget.targetLimb == oldController.leftFoot)
+                            resolvedLimb = controller.leftFoot;
+                    }
+                    else if (oldController == controller)
+                    {
+                        resolvedLimb = limbTarget.targetLimb; // Already correct
+                    }
+                }
+                
+                if (resolvedLimb != null)
+                {
+                    limbTarget.targetLimb = resolvedLimb;
                 }
             }
         }

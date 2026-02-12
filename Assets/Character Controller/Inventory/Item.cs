@@ -42,6 +42,10 @@ public class Item : ScriptableObject
     [Tooltip("Optional: define multiple sprites for a single clothing item (e.g., a Shirt). If set, these are used instead of the legacy single-slot fields above.")]
     public ClothingPiece[] clothingPieces;
 
+    [Header("Weapon (when ItemType = Weapon)")]
+    [Tooltip("Prefab to instantiate when equipping this weapon. If set, weapons are spawned from the project instead of requiring scene objects.")]
+    public GameObject weaponPrefab;
+
     /// <summary>
     /// Enum defining different types of items
     /// </summary>

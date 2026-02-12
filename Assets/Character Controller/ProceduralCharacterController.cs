@@ -371,13 +371,14 @@ public class ProceduralCharacterController : MonoBehaviour
         {
             aimInput = Vector2.zero;
         }
-        // Get mouse position for aiming (only if NOT in overview mode)
-        else if (mainCamera != null && Mouse.current != null)
+        // Get mouse position for aiming - only update when inventory is closed (keeps last angle when open to prevent spinning)
+        else if (!InventoryUI.IsInventoryOpen && mainCamera != null && Mouse.current != null)
         {
             Vector2 mousePos = Mouse.current.position.ReadValue();
             Vector2 worldPos = mainCamera.ScreenToWorldPoint(mousePos);
             aimInput = (worldPos - (Vector2)transform.position).normalized;
         }
+        // When inventory is open: aimInput keeps its last value so torso stays locked to that angle (no uncontrolled spins)
         
         // Handle keyboard input for WASD movement (will be ignored if in overview mode)
         HandleKeyboardInput();
@@ -438,12 +439,15 @@ public class ProceduralCharacterController : MonoBehaviour
         }
         
         // Rotate torso towards aim direction (slower than head)
+        // When aimInput is valid, lock to that angle and zero angular velocity to prevent uncontrolled spinning from collisions
         if (aimInput.magnitude > 0.1f)
         {
             float targetAngle = Mathf.Atan2(aimInput.y, aimInput.x) * Mathf.Rad2Deg;
             
             if (torso != null)
             {
+                // Zero angular velocity so collisions don't cause runaway spinning
+                torso.angularVelocity = 0f;
                 // Smoothly rotate towards target angle
                 float currentAngle = torso.rotation;
                 float newAngle = Mathf.LerpAngle(currentAngle, targetAngle, rotationSpeed * Time.fixedDeltaTime);
@@ -478,9 +482,10 @@ public class ProceduralCharacterController : MonoBehaviour
                 moveInput.Normalize();
             }
             
-            // Attack/Use input (Left Mouse Button or Space)
-            if ((Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) || 
-                Keyboard.current.spaceKey.wasPressedThisFrame)
+            // Attack/Use input (Left Mouse Button or Space) - blocked when inventory is open
+            if (!InventoryUI.IsInventoryOpen &&
+                ((Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) || 
+                Keyboard.current.spaceKey.wasPressedThisFrame))
             {
                 // Clear stale ignore flag if we're past the possessed frame (script order can make us miss the possession click)
                 if (ignoreNextAttackInput && Time.frameCount > possessedFrame)
@@ -783,6 +788,7 @@ public class ProceduralCharacterController : MonoBehaviour
         if (equippedItem != null)
         {
             EquippableItem itemToUnequip = equippedItem;
+            Item itemData = itemToUnequip.itemData;
             
             // Handle one-handed weapon unequipping (character-specific sprites)
             if (itemToUnequip is WeaponOneHanded oneHandedUnequip)
@@ -807,26 +813,26 @@ public class ProceduralCharacterController : MonoBehaviour
             itemToUnequip.transform.SetParent(null);
             equippedItem = null;
             
-            // Add to inventory if requested and item has itemData
-            if (addToInventory && inventory != null)
+            // Remove from owned weapon instances (weapon no longer equipped)
+            if (itemData != null)
             {
-                // Try to get item data from equippable item
-                Item itemData = itemToUnequip.itemData;
-                
-                // If item has data, add to inventory
-                if (itemData != null)
-                {
-                    inventory.AddItem(itemData, 1);
-                }
-                // Otherwise, deactivate the GameObject (it's not in inventory system)
-                else
-                {
-                    itemToUnequip.gameObject.SetActive(false);
-                }
+                ownedWeaponInstances.Remove(itemData);
             }
-            else if (!addToInventory)
+            
+            // Add to inventory if requested and item has itemData
+            if (addToInventory && inventory != null && itemData != null)
             {
-                // If not adding to inventory, deactivate
+                inventory.AddItem(itemData, 1);
+            }
+            
+            // Prefab-spawned weapons: destroy (will re-instantiate from Item.weaponPrefab on next equip)
+            // Scene-based weapons or non-inventory items: deactivate for reuse
+            if (itemData != null && itemData.weaponPrefab != null)
+            {
+                Destroy(itemToUnequip.gameObject);
+            }
+            else
+            {
                 itemToUnequip.gameObject.SetActive(false);
             }
         }
@@ -961,7 +967,33 @@ public class ProceduralCharacterController : MonoBehaviour
             }
         }
         
-        // Find a template weapon to clone (look for any existing weapon with this itemData)
+        // Prefer instantiating from Item's weaponPrefab (project asset) - no scene object required
+        if (itemData.weaponPrefab != null)
+        {
+            Weapon prefabWeapon = itemData.weaponPrefab.GetComponent<Weapon>();
+            if (prefabWeapon != null)
+            {
+                GameObject newWeaponGO = Instantiate(itemData.weaponPrefab);
+                newWeaponGO.name = $"{itemData.weaponPrefab.name}_{gameObject.name}";
+                
+                Weapon newWeapon = newWeaponGO.GetComponent<Weapon>();
+                if (newWeapon != null)
+                {
+                    if (newWeapon.itemData == null)
+                        newWeapon.itemData = itemData;
+                    
+                    ownedWeaponInstances[itemData] = newWeapon;
+                    newWeaponGO.SetActive(true);
+                    return newWeapon;
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Item {itemData.itemName}'s weaponPrefab has no Weapon component.");
+            }
+        }
+        
+        // Fallback: find a template weapon in the scene to clone (legacy - requires scene object)
         Weapon templateWeapon = null;
         Weapon[] allWeapons = FindObjectsByType<Weapon>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var weapon in allWeapons)
@@ -1032,9 +1064,14 @@ public class ProceduralCharacterController : MonoBehaviour
         {
             if (kvp.Value != null)
             {
-                kvp.Value.gameObject.SetActive(false);
+                // Prefab-spawned: destroy. Scene-based: deactivate for reuse.
+                if (kvp.Key != null && kvp.Key.weaponPrefab != null)
+                    Destroy(kvp.Value.gameObject);
+                else
+                    kvp.Value.gameObject.SetActive(false);
             }
         }
+        ownedWeaponInstances.Clear();
     }
     
     /// <summary>
@@ -1094,6 +1131,26 @@ public class ProceduralCharacterController : MonoBehaviour
         }
         
         return wasUsed;
+    }
+    
+    /// <summary>
+    /// Use a consumable item on a specific limb (e.g. after user selected a limb on the body outline). Removes one from inventory if successful.
+    /// </summary>
+    public bool UseConsumableOnLimb(Item item, LimbType limbType, int quantity = 1)
+    {
+        if (inventory == null || item == null)
+            return false;
+        if (item.itemType != Item.ItemType.Consumable)
+            return false;
+        if (!inventory.HasItem(item, quantity))
+            return false;
+        
+        if (item is ConsumableItem consumable && consumable.UseOnLimb(this, limbType))
+        {
+            inventory.RemoveItem(item, 1);
+            return true;
+        }
+        return false;
     }
     
     // Possession-related method removed

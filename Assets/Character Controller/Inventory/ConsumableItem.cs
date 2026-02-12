@@ -17,7 +17,13 @@ public class ConsumableItem : Item
     [Tooltip("Whether to heal all limbs equally or just the most damaged ones")]
     public bool healAllLimbs = true;
     
-    [Tooltip("Time in seconds it takes to use this item")]
+    [Tooltip("If true, using this item requires selecting a limb on the body outline first (click item, then click limb).")]
+    public bool requiresLimbTarget = false;
+    
+    [Tooltip("When used on a limb, also stop bleeding on that limb (via BleedingController).")]
+    public bool stopsBleeding = false;
+    
+    [Tooltip("Delay in seconds before this item can be used again. On each use, an audio clip plays and a radial fill (on the slot's green dot) fills in sync with this delay to show when it's ready.")]
     public float useTime = 1f;
     
     private void OnEnable()
@@ -81,6 +87,42 @@ public class ConsumableItem : Item
                 }
             }
             wasUsed = true;
+        }
+        
+        return wasUsed;
+    }
+    
+    /// <summary>
+    /// Use the consumable on a specific limb (e.g. after user selected a limb on the body outline).
+    /// Applies healthRestore to that limb and optionally stops bleeding. Returns true if any effect was applied.
+    /// </summary>
+    public bool UseOnLimb(ProceduralCharacterController character, ProceduralCharacterController.LimbType limbType)
+    {
+        if (character == null)
+            return false;
+        
+        bool wasUsed = false;
+        
+        if (healthRestore > 0f)
+        {
+            character.HealLimb(limbType, healthRestore);
+            wasUsed = true;
+        }
+        
+        if (limbHealthRestore > 0f)
+        {
+            character.HealLimb(limbType, limbHealthRestore);
+            wasUsed = true;
+        }
+        
+        if (stopsBleeding)
+        {
+            var bleedingController = character.GetComponent<BleedingController>();
+            if (bleedingController != null)
+            {
+                bleedingController.StopBleeding(limbType);
+                wasUsed = true;
+            }
         }
         
         return wasUsed;
