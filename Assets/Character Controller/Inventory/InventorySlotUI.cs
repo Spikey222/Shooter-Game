@@ -53,8 +53,6 @@ public class InventorySlotUI : MonoBehaviour
 
     private bool DebugEnabled => parentUI != null && parentUI.enableDebugLogs;
 
-    private const float PoundsPerKilogram = 2.20462262f;
-
     private void AutoWireEquippedIndicatorIfNeeded()
     {
         if (equippedIndicator != null)
@@ -73,28 +71,37 @@ public class InventorySlotUI : MonoBehaviour
 
     private void EnsureCooldownRadialImage()
     {
+        string source = "none";
+        if (cooldownImage != null)
+        {
+            source = "assigned";
+        }
+        else if (equippedIndicator != null)
+        {
+            Transform cooldownT = equippedIndicator.transform.Find("CooldownRadial");
+            if (cooldownT != null)
+            {
+                cooldownImage = cooldownT.GetComponent<Image>();
+                if (cooldownImage != null)
+                    source = "CooldownRadial";
+            }
+            if (cooldownImage == null)
+            {
+                cooldownImage = equippedIndicator.GetComponent<Image>();
+                if (cooldownImage != null)
+                    source = "equippedIndicator";
+            }
+        }
         if (cooldownImage != null)
         {
             cooldownImage.type = Image.Type.Filled;
             cooldownImage.fillMethod = Image.FillMethod.Radial360;
-            cooldownImage.fillOrigin = (int)Image.Origin360.Right;
+            cooldownImage.fillOrigin = (int)Image.Origin360.Bottom;
             cooldownImage.fillClockwise = true;
-            return;
         }
-        if (equippedIndicator == null)
-            return;
-        Transform cooldownT = equippedIndicator.transform.Find("CooldownRadial");
-        if (cooldownT != null)
-        {
-            cooldownImage = cooldownT.GetComponent<Image>();
-            if (cooldownImage != null)
-            {
-                cooldownImage.type = Image.Type.Filled;
-                cooldownImage.fillMethod = Image.FillMethod.Radial360;
-                cooldownImage.fillOrigin = (int)Image.Origin360.Right;
-                cooldownImage.fillClockwise = true;
-            }
-        }
+        // #region agent log
+        try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_ensureRadial\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventorySlotUI.EnsureCooldownRadialImage\",\"message\":\"Radial image\",\"data\":{\"cooldownImageSet\":" + (cooldownImage != null ? "true" : "false") + ",\"source\":\"" + source + "\"},\"hypothesisId\":\"H2\"}\n"); } catch { }
+        // #endregion
     }
 
     private void AutoWireDisplayReferencesIfNeeded()
@@ -171,7 +178,8 @@ public class InventorySlotUI : MonoBehaviour
         AutoWireDisplayReferencesIfNeeded();
         AutoWireButtonsIfNeeded();
         AutoWireEquippedIndicatorIfNeeded();
-        EnsureCooldownRadialImage();
+        if (invItem != null && !invItem.IsEmpty() && invItem.item is ConsumableItem cons && cons.useTime > 0f)
+            EnsureCooldownRadialImage();
         
         UpdateDisplay();
         
@@ -248,16 +256,15 @@ public class InventorySlotUI : MonoBehaviour
             }
         }
         
-        // Set weight
+        // Set weight (Item.weight is in pounds; display as-is)
         if (weightText != null)
         {
-            float totalWeightKg = inventoryItem.GetTotalWeight();
-            float totalWeightLb = totalWeightKg * PoundsPerKilogram;
+            float totalWeightLb = inventoryItem.GetTotalWeight();
             weightText.text = $"{totalWeightLb:F1} lb";
             weightText.gameObject.SetActive(true);
         }
 
-        // Equipped indicator (for clothing and weapons), or pulsating indicator when bandage/limb-target mode is active
+        // Equipped indicator: on only when equipped (weapon/clothing) or consumable is actively selected for limb targeting (pending healable). Not when medic is just sitting in inventory or on cooldown.
         if (equippedIndicator != null)
         {
             bool isEquipped = false;
@@ -279,11 +286,13 @@ public class InventorySlotUI : MonoBehaviour
             equippedIndicator.SetActive(isEquipped || pendingHealableActive);
         }
         
-        // Cooldown radial: show for consumables with Use Time (delay), hide otherwise
+        // Cooldown radial: only show when consumable has Use Time. Do not turn on the GameObject when it is the same as EquippedIndicator (green dot) — that would make the dot persistent; visibility is already set above.
         if (cooldownImage != null)
         {
             bool showCooldown = item is ConsumableItem cons && cons.useTime > 0f;
-            cooldownImage.gameObject.SetActive(showCooldown);
+            bool isSameAsIndicator = equippedIndicator != null && cooldownImage.gameObject == equippedIndicator;
+            if (!isSameAsIndicator)
+                cooldownImage.gameObject.SetActive(showCooldown);
             if (showCooldown && cooldownRemaining <= 0f)
                 cooldownImage.fillAmount = 1f;
         }
@@ -363,6 +372,9 @@ public class InventorySlotUI : MonoBehaviour
         cooldownRemaining = duration;
         if (cooldownImage != null)
             cooldownImage.fillAmount = 0f;
+        // #region agent log
+        try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_slotStartCD\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventorySlotUI.StartCooldown\",\"message\":\"Cooldown started\",\"data\":{\"duration\":" + duration + ",\"cooldownImageNotNull\":" + (cooldownImage != null ? "true" : "false") + "},\"hypothesisId\":\"H2\"}\n"); } catch { }
+        // #endregion
     }
 
     /// <summary>
@@ -388,7 +400,12 @@ public class InventorySlotUI : MonoBehaviour
         if (inventoryItem == null || inventoryItem.IsEmpty())
             return;
 
-        if (inventoryItem.item is ConsumableItem consumable && consumable.useTime > 0f && IsOnCooldown())
+        float useTimeVal = inventoryItem.item is ConsumableItem cons ? cons.useTime : 0f;
+        bool onCD = useTimeVal > 0f && IsOnCooldown();
+        // #region agent log
+        try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_slotClick\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventorySlotUI.OnSlotButtonClicked\",\"message\":\"Slot click\",\"data\":{\"itemName\":\"" + (inventoryItem?.item?.name ?? "null") + "\",\"useTime\":" + useTimeVal + ",\"isOnCooldown\":" + (IsOnCooldown() ? "true" : "false") + ",\"cooldownRemaining\":" + cooldownRemaining + ",\"blocked\":" + (onCD ? "true" : "false") + "},\"hypothesisId\":\"H5\"}\n"); } catch { }
+        // #endregion
+        if (onCD)
             return;
 
         parentUI?.OnItemSlotClicked(slotIndex);

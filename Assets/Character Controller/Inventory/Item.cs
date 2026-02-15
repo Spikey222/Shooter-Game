@@ -42,6 +42,10 @@ public class Item : ScriptableObject
     [Tooltip("Optional: define multiple sprites for a single clothing item (e.g., a Shirt). If set, these are used instead of the legacy single-slot fields above.")]
     public ClothingPiece[] clothingPieces;
 
+    [Header("Clothing damage mitigation (when ItemType = Clothing)")]
+    [Tooltip("Per-limb, per-damage-type mitigation. Negative values increase damage (e.g. -0.2 = 20% more from that type).")]
+    public LimbDamageMitigation[] damageMitigationPerLimb;
+
     [Header("Weapon (when ItemType = Weapon)")]
     [Tooltip("Prefab to instantiate when equipping this weapon. If set, weapons are spawned from the project instead of requiring scene objects.")]
     public GameObject weaponPrefab;
@@ -93,6 +97,41 @@ public class Item : ScriptableObject
 
         [Tooltip("Local X/Y offset applied when visualMode = Overlay (ignored for ReplaceSprite)")]
         public Vector2 localOffset;
+    }
+
+    /// <summary>
+    /// One entry per limb: select the limb, then set mitigation per damage type with sliders. Negative = more damage from that type.
+    /// </summary>
+    [System.Serializable]
+    public struct LimbDamageMitigation
+    {
+        [Tooltip("Which limb this row applies to")]
+        public ProceduralCharacterController.LimbType limb;
+
+        [Header("Mitigation per damage type (0.3 = 30% less, -0.2 = 20% more)")]
+        [Range(-1f, 1f)] [Tooltip("Blunt")]
+        public float blunt;
+        [Range(-1f, 1f)] [Tooltip("Stab")]
+        public float stab;
+        [Range(-1f, 1f)] [Tooltip("Slash")]
+        public float slash;
+        [Range(-1f, 1f)] [Tooltip("Generic (bleed, environmental, etc.)")]
+        public float generic;
+
+        /// <summary>
+        /// Get mitigation for a damage type (used by ClothingController).
+        /// </summary>
+        public float GetMitigationFor(Weapon.DamageType damageType)
+        {
+            switch (damageType)
+            {
+                case Weapon.DamageType.Blunt: return blunt;
+                case Weapon.DamageType.Stab: return stab;
+                case Weapon.DamageType.Slash: return slash;
+                case Weapon.DamageType.Generic: return generic;
+                default: return 0f;
+            }
+        }
     }
     
     /// <summary>

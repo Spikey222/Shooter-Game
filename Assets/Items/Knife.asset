@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f68fe9ea0bb1db4f9c17888eb52324b, type: 3}
   m_Name: Knife
   m_EditorClassIdentifier: Assembly-CSharp::Item
-  itemName: Knife
+  itemName: Green Knife
   description: Item description
   icon: {fileID: 1226911268488096868, guid: 3557191d1afb24447b628a5a52b3dc9c, type: 3}
   weight: 1
@@ -22,4 +22,5 @@ MonoBehaviour:
   overlaySprite: {fileID: 0}
   overlayOffset: {x: 0, y: 0}
   clothingPieces: []
+  damageMitigationPerLimb: []
   weaponPrefab: {fileID: 821462587425167877, guid: 256ad179088f5d04e87e7a7ecf14935b, type: 3}

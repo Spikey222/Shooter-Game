@@ -200,10 +200,12 @@ public class SpectatorController : MonoBehaviour
     {
         if (character != null)
         {
+            if (character.IsDead)
+                return;
             // Only allow switching to characters with matching team ID
             if (character.teamId != teamId)
                 return;
-            
+
             // If we already have a controlled character, release it first
             if (controlledCharacter != null)
             {
@@ -322,10 +324,12 @@ public class SpectatorController : MonoBehaviour
         
         foreach (ProceduralCharacterController character in characters)
         {
+            if (character.IsDead)
+                continue;
             // Skip characters already in spectator mode
             if (character.spectatorMode)
                 continue;
-                
+
             // Skip characters with different team ID
             if (character.teamId != teamId)
                 continue;
@@ -353,8 +357,24 @@ public class SpectatorController : MonoBehaviour
         if (controlledCharacter == newCharacter)
             return;
 
+        if (controlledCharacter != null)
+            controlledCharacter.OnDeath -= OnControlledCharacterDied;
+
         controlledCharacter = newCharacter;
+
+        if (controlledCharacter != null)
+            controlledCharacter.OnDeath += OnControlledCharacterDied;
+
         OnControlledCharacterChanged?.Invoke(controlledCharacter);
+    }
+
+    private void OnControlledCharacterDied()
+    {
+        if (controlledCharacter != null)
+        {
+            controlledCharacter.OnDeath -= OnControlledCharacterDied;
+            ReleaseControl();
+        }
     }
     
     // Handle mouse input for character control
@@ -373,6 +393,8 @@ public class SpectatorController : MonoBehaviour
             // Find the character under the cursor
             foreach (ProceduralCharacterController character in characters)
             {
+                if (character.IsDead)
+                    continue;
                 // Only allow taking control of characters that ARE in spectator mode
                 // (meaning they're not already controlled by the player)
                 if (!character.spectatorMode)

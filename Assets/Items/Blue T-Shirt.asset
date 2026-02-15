@@ -42,3 +42,30 @@ MonoBehaviour:
     visualMode: 1
     sprite: {fileID: 7376139143079307745, guid: 17b90b9e0416bbd4a8012db08fc74223, type: 3}
     localOffset: {x: 0, y: 0}
+  damageMitigationPerLimb:
+  - limb: 3
+    blunt: 0
+    stab: 0
+    slash: 0.1
+    generic: 0
+  - limb: 4
+    blunt: 0
+    stab: 0
+    slash: 0.1
+    generic: 0
+  - limb: 6
+    blunt: 0
+    stab: 0
+    slash: 0.1
+    generic: 0
+  - limb: 7
+    blunt: 0
+    stab: 0
+    slash: 0.1
+    generic: 0
+  - limb: 2
+    blunt: 0
+    stab: 0
+    slash: 0.1
+    generic: 0
+  weaponPrefab: {fileID: 0}

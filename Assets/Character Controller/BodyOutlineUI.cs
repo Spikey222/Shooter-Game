@@ -74,6 +74,9 @@ public class BodyOutlineUI : MonoBehaviour
 
     private bool wasInventoryOpen;
 
+    // Resolved at runtime: the "Outline" GameObject (found by name, like InventoryUI's panel)
+    private GameObject outlineRoot;
+
     private void Awake()
     {
         // Initialize the limb images dictionary
@@ -102,6 +105,32 @@ public class BodyOutlineUI : MonoBehaviour
             canvas.enabled = false;
             wasAttached = false;
         }
+
+        // Find "Outline" by name (same idea as InventoryUI: one known element). Disable until we possess a character.
+        ResolveOutlineRoot();
+        if (outlineRoot != null)
+            outlineRoot.SetActive(false);
+    }
+
+    private void ResolveOutlineRoot()
+    {
+        if (outlineRoot != null) return;
+        Transform direct = transform.Find("Outline");
+        if (direct != null)
+        {
+            outlineRoot = direct.gameObject;
+            return;
+        }
+        foreach (Transform t in GetComponentsInChildren<Transform>(true))
+        {
+            if (t != null && t.gameObject.name == "Outline")
+            {
+                outlineRoot = t.gameObject;
+                return;
+            }
+        }
+        if (gameObject.name == "Outline")
+            outlineRoot = gameObject;
     }
 
     private void Start()
@@ -592,8 +621,12 @@ public class BodyOutlineUI : MonoBehaviour
             canvas.enabled = isAttached;
             wasAttached = isAttached;
         }
+
+        // Enable/disable outline root with possession (same system as InventoryUI: active only while on a character)
+        if (outlineRoot != null)
+            outlineRoot.SetActive(isAttached);
         
-        // Target alpha: inventory = instant full (no fade). Else show after taking control, or after recent damage; otherwise fade out.
+        // Target alpha: inventory = full. Else when on a character, show for X seconds after control or after recent damage, then fade out.
         bool inventoryOpen = inventoryUI != null && inventoryUI.inventoryPanel != null && inventoryUI.inventoryPanel.activeSelf;
         if (inventoryOpen)
         {

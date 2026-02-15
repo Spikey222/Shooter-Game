@@ -558,9 +558,17 @@ public class WaypointAnimation : MonoBehaviour
                 rb.angularVelocity = velocityReduction;
             }
             
-            // Update motor speed with smoothing
+            // Update motor speed with smoothing - respects joint's configured limits
             if (remainingTime > 0.01f && Mathf.Abs(remainingAngle) > 0.5f)
             {
+                // Clamp target to joint's configured limits
+                float clampedTarget = currentTargetAngle;
+                if (joint.useLimits)
+                {
+                    clampedTarget = Mathf.Clamp(currentTargetAngle, joint.limits.min, joint.limits.max);
+                    remainingAngle = Mathf.DeltaAngle(joint.jointAngle, clampedTarget);
+                }
+                
                 // Calculate speed needed, but apply smoothing to reduce aggressiveness
                 float baseSpeed = remainingAngle / remainingTime;
                 
@@ -568,17 +576,9 @@ public class WaypointAnimation : MonoBehaviour
                 float smoothingFactor = 1f + (returnToNeutralSmoothing * (1f - t));
                 float smoothedSpeed = baseSpeed / smoothingFactor;
                 
-                // Update joint limits with gradually tightening range
-                joint.useLimits = true;
-                JointAngleLimits2D limits = joint.limits;
-                float range = Mathf.Lerp(15f, 5f, smoothedT); // Gradually tighten limits
-                limits.min = currentTargetAngle - range;
-                limits.max = currentTargetAngle + range;
-                joint.limits = limits;
-                
-                // Use reduced torque for smoother return (less aggressive)
+                // Motor drives toward target (limits constrain movement)
                 JointMotor2D motor = joint.motor;
-                motor.maxMotorTorque = Mathf.Lerp(motorTorque * 0.5f, motorTorque * 0.3f, smoothedT); // Lower torque for smoother return
+                motor.maxMotorTorque = Mathf.Lerp(motorTorque * 0.5f, motorTorque * 0.3f, smoothedT);
                 motor.motorSpeed = smoothedSpeed;
                 joint.motor = motor;
             }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 /// <summary>
@@ -32,9 +33,13 @@ public class BleedingController : MonoBehaviour
     [Range(0.1f, 5f)]
     public float baseBleedRate = 1f;
 
-    [Tooltip("Accumulator value required to spawn one blood instance")]
+    [Tooltip("Accumulator value required to spawn one blood instance. Lower = more sprites spawn.")]
     [Range(0.1f, 3f)]
-    public float bleedSpawnThreshold = 1f;
+    public float bleedSpawnThreshold = 0.25f;
+
+    [Tooltip("Limb does not bleed from blunt damage when health % is above this (0-1). Blunt bleeds only when health is at or below this (heavily bashed).")]
+    [Range(0f, 1f)]
+    public float heavyBashBleedThreshold = 0.3f;
 
     [Header("Blood Visual")]
     [Tooltip("If set, this prefab is instantiated for each spawn; otherwise use Blood Sprite Variants")]
@@ -100,10 +105,29 @@ public class BleedingController : MonoBehaviour
     [Range(0f, 2f)]
     public float heavyBleedThreshold = 0.5f;
 
+    [Header("Blood Level (bleed-to-death)")]
+    [Tooltip("Maximum blood level. Character dies when it reaches 0.")]
+    [Range(10f, 200f)]
+    public float maxBloodLevel = 100f;
+    [Tooltip("Blood drained per second per unit of total bleed intensity across all limbs.")]
+    [Range(0.5f, 20f)]
+    public float bloodDrainPerIntensityPerSecond = 0.5f;
+
+    /// <summary>
+    /// Fired when blood level changes. Parameters: current, max. Subscribe for UI updates.
+    /// </summary>
+    public event Action<float, float> OnBloodLevelChanged;
+
+    /// <summary>
+    /// True when character has died from blood loss (blood level reached 0).
+    /// </summary>
+    public bool IsDeadFromBloodLoss { get; private set; }
+
     private ProceduralCharacterController characterController;
     private Dictionary<ProceduralCharacterController.LimbType, float> bleedAccumulators = new Dictionary<ProceduralCharacterController.LimbType, float>();
     private float bleedDoTTimer;
     private SpriteRenderer characterSortingReference;
+    private float currentBloodLevel;
 
     private void Awake()
     {
@@ -119,6 +143,33 @@ public class BleedingController : MonoBehaviour
             ApplyDefaultBleedMultipliers();
 
         InitializeAccumulators();
+        currentBloodLevel = maxBloodLevel;
+    }
+
+    private void Start()
+    {
+        OnBloodLevelChanged?.Invoke(currentBloodLevel, maxBloodLevel);
+    }
+
+    /// <summary>
+    /// Current blood level (0 = dead from blood loss).
+    /// </summary>
+    public float GetCurrentBloodLevel() => currentBloodLevel;
+
+    /// <summary>
+    /// Blood level as 0-1 for UI (e.g. fill amount).
+    /// </summary>
+    public float GetBloodLevelPercent() => maxBloodLevel > 0f ? Mathf.Clamp01(currentBloodLevel / maxBloodLevel) : 1f;
+
+    /// <summary>
+    /// Restore blood level by the given amount (e.g. from consumables). Clamps to [0, maxBloodLevel].
+    /// Does not revive if already dead from blood loss. Fires OnBloodLevelChanged for UI.
+    /// </summary>
+    public void RestoreBlood(float amount)
+    {
+        if (amount <= 0f) return;
+        currentBloodLevel = Mathf.Clamp(currentBloodLevel + amount, 0f, maxBloodLevel);
+        OnBloodLevelChanged?.Invoke(currentBloodLevel, maxBloodLevel);
     }
 
     /// <summary>
@@ -177,11 +228,20 @@ public class BleedingController : MonoBehaviour
         if (characterController == null)
             return;
 
+        if (IsDeadFromBloodLoss)
+            return;
+
         float dt = Time.deltaTime;
+        float totalBleedIntensity = 0f;
 
         foreach (ProceduralCharacterController.LimbType limbType in Enum.GetValues(typeof(ProceduralCharacterController.LimbType)))
         {
             float healthPercent = GetHealthPercentFor(limbType);
+            if (!ShouldBleedFromLimbDamage(limbType, healthPercent))
+            {
+                bleedAccumulators[limbType] = 0f;
+                continue;
+            }
             float multiplier = GetBleedMultiplierFor(limbType);
             float intensity = (1f - healthPercent) * multiplier * baseBleedRate;
 
@@ -192,12 +252,27 @@ public class BleedingController : MonoBehaviour
             }
 
             bleedAccumulators[limbType] += intensity * dt;
+            totalBleedIntensity += intensity;
 
             while (bleedAccumulators[limbType] >= bleedSpawnThreshold)
             {
                 bleedAccumulators[limbType] -= bleedSpawnThreshold;
                 Vector2 worldPos = GetSpawnPositionFor(limbType);
                 SpawnBlood(worldPos, limbType);
+            }
+        }
+
+        // Blood level drain: lose blood proportional to total bleed intensity
+        if (totalBleedIntensity > 0f && currentBloodLevel > 0f)
+        {
+            float drain = totalBleedIntensity * bloodDrainPerIntensityPerSecond * dt;
+            float previousBlood = currentBloodLevel;
+            currentBloodLevel = Mathf.Max(0f, currentBloodLevel - drain);
+            OnBloodLevelChanged?.Invoke(currentBloodLevel, maxBloodLevel);
+            if (currentBloodLevel <= 0f)
+            {
+                IsDeadFromBloodLoss = true;
+                characterController.TriggerDeathFromBloodLoss();
             }
         }
 
@@ -252,9 +327,34 @@ public class BleedingController : MonoBehaviour
     {
         if (characterController == null) return 0f;
         float healthPercent = GetHealthPercentFor(limbType);
+        if (!ShouldBleedFromLimbDamage(limbType, healthPercent))
+            return 0f;
         float multiplier = GetBleedMultiplierFor(limbType);
         float intensity = (1f - healthPercent) * multiplier * baseBleedRate;
         return intensity;
+    }
+
+    /// <summary>
+    /// True when the limb is "heavily bashed": only Blunt (and optionally Generic) damage and health % at or below heavyBashBleedThreshold.
+    /// Used by consumables to skip healing/stop-bleeding on such limbs.
+    /// </summary>
+    public bool IsLimbHeavilyBashed(ProceduralCharacterController.LimbType limb)
+    {
+        if (characterController == null) return false;
+        float healthPercent = GetHealthPercentFor(limb);
+        var types = characterController.GetDamageTypesForLimb(limb);
+        bool hasStabOrSlash = types != null && types.Any(t => t == Weapon.DamageType.Stab || t == Weapon.DamageType.Slash);
+        if (hasStabOrSlash) return false;
+        return healthPercent <= heavyBashBleedThreshold;
+    }
+
+    private bool ShouldBleedFromLimbDamage(ProceduralCharacterController.LimbType limbType, float healthPercent)
+    {
+        if (characterController == null) return false;
+        var damageTypesForLimb = characterController.GetDamageTypesForLimb(limbType);
+        bool hasStabOrSlash = damageTypesForLimb != null && damageTypesForLimb.Any(t => t == Weapon.DamageType.Stab || t == Weapon.DamageType.Slash);
+        if (hasStabOrSlash) return true;
+        return healthPercent <= heavyBashBleedThreshold;
     }
 
     /// <summary>
@@ -397,6 +497,8 @@ public class BleedingController : MonoBehaviour
         foreach (ProceduralCharacterController.LimbType limbType in Enum.GetValues(typeof(ProceduralCharacterController.LimbType)))
         {
             float healthPercent = GetHealthPercentFor(limbType);
+            if (!ShouldBleedFromLimbDamage(limbType, healthPercent))
+                continue;
             float multiplier = GetBleedMultiplierFor(limbType);
             float intensity = (1f - healthPercent) * multiplier;
             if (intensity <= 0f)
@@ -404,7 +506,7 @@ public class BleedingController : MonoBehaviour
 
             float damage = bleedDamagePerSecond * bleedDoTInterval * intensity;
             if (damage > 0f)
-                characterController.ApplyDamageToLimb(limbType, damage);
+                characterController.ApplyDamageToLimb(limbType, damage, Weapon.DamageType.Generic);
         }
     }
 }

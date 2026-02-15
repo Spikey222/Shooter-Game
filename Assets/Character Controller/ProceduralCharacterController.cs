@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System;
@@ -30,6 +31,39 @@ public class ProceduralCharacterController : MonoBehaviour
     
     // Dictionary to map limbs to their types
     private Dictionary<LimbType, ProceduralLimb> limbMap = new Dictionary<LimbType, ProceduralLimb>();
+
+    // Last damage type per limb (for body-part UI wording, e.g. "badly slashed")
+    private Dictionary<LimbType, Weapon.DamageType> lastDamageTypeByLimb = new Dictionary<LimbType, Weapon.DamageType>();
+    // All damage types that have affected each limb (for UI: show Stab, Slash, Blunt etc.)
+    private Dictionary<LimbType, HashSet<Weapon.DamageType>> damageTypesByLimb = new Dictionary<LimbType, HashSet<Weapon.DamageType>>();
+    // Accumulated blunt damage per limb (increases vulnerability to future damage)
+    private Dictionary<LimbType, float> bluntTraumaByLimb = new Dictionary<LimbType, float>();
+    // Accumulated pain per limb (increases with damage, optional decay)
+    private Dictionary<LimbType, float> painByLimb = new Dictionary<LimbType, float>();
+
+    [Header("Blunt Trauma (vulnerability)")]
+    [Tooltip("Extra damage multiplier per 'limb max health' of blunt trauma (e.g. 0.5 = 50%% more damage when trauma equals max health)")]
+    [Range(0f, 2f)]
+    public float bluntTraumaVulnerabilityScale = 0.5f;
+    [Tooltip("Cap on vulnerability increase (e.g. 0.5 = at most 50%% more damage, multiplier 1.5)")]
+    [Range(0f, 1f)]
+    public float bluntTraumaVulnerabilityCap = 0.5f;
+
+    [Header("Laceration severity (for bandage/stitches)")]
+    [Tooltip("Health %% above this = light severity (bandages fully heal).")]
+    [Range(0f, 1f)]
+    public float lacerationLightThreshold = 0.66f;
+    [Tooltip("Health %% below this = heavy severity (need stitches to heal). Between light and heavy = medium.")]
+    [Range(0f, 1f)]
+    public float lacerationHeavyThreshold = 0.33f;
+    
+    [Header("Pain")]
+    [Tooltip("Pain added per point of damage taken (0 = no pain)")]
+    public float painPerDamage = 1f;
+    [Tooltip("Max pain value per limb (displayed as 100% when at or above this)")]
+    public float maxPainPerLimb = 100f;
+    [Tooltip("Pain decay per second (0 = no decay)")]
+    public float painDecayPerSecond = 2f;
     
     // Event for when any limb's health changes
     public event Action<LimbType, float, float> OnLimbHealthChanged; // limbType, current, max
@@ -69,7 +103,17 @@ public class ProceduralCharacterController : MonoBehaviour
     
     // Event for when character's overall health changes
     public event Action<float, float> OnHealthChanged; // current, max
-    
+
+    /// <summary>
+    /// Fired when the character dies (e.g. from blood loss). SpectatorController should release control.
+    /// </summary>
+    public event Action OnDeath;
+
+    /// <summary>
+    /// True when the character has died (e.g. from blood loss). Character is disabled and cannot be controlled.
+    /// </summary>
+    public bool IsDead { get; private set; }
+
     [Tooltip("Movement speed of the character")]
     public float moveSpeed = 5f;
     
@@ -397,6 +441,20 @@ public class ProceduralCharacterController : MonoBehaviour
         
         // Update camera position and zoom if attached
         UpdateCamera();
+        
+        // Decay pain over time
+        if (painDecayPerSecond > 0f && painByLimb.Count > 0)
+        {
+            var limbs = painByLimb.Keys.ToList();
+            foreach (LimbType limb in limbs)
+            {
+                float p = painByLimb[limb] - painDecayPerSecond * Time.deltaTime;
+                if (p <= 0f)
+                    painByLimb.Remove(limb);
+                else
+                    painByLimb[limb] = p;
+            }
+        }
     }
     
     private void FixedUpdate()
@@ -581,7 +639,7 @@ public class ProceduralCharacterController : MonoBehaviour
             
             if (leftHand != null)
             {
-                leftHand.SetTargetAngle(leftHandBaseAngle);
+                leftHand.SetTargetAngle(0f); // Zero to align with forearm (avoids lower limit capping)
             }
         }
         else
@@ -620,7 +678,7 @@ public class ProceduralCharacterController : MonoBehaviour
             
             if (leftHand != null)
             {
-                leftHand.SetTargetAngle(leftHandBaseAngle);
+                leftHand.SetTargetAngle(0f); // Zero to align with forearm (avoids lower limit capping)
             }
         }
     }
@@ -1099,9 +1157,9 @@ public class ProceduralCharacterController : MonoBehaviour
     }
     
     /// <summary>
-    /// Use a consumable item from inventory
+    /// Use a consumable item from inventory. When slotIndex >= 0, removes from that slot (so the selected stack is used); otherwise removes from first stack of that item.
     /// </summary>
-    public bool UseConsumable(Item item, int quantity = 1)
+    public bool UseConsumable(Item item, int quantity = 1, int slotIndex = -1)
     {
         if (inventory == null || item == null)
             return false;
@@ -1109,10 +1167,15 @@ public class ProceduralCharacterController : MonoBehaviour
         if (item.itemType != Item.ItemType.Consumable)
             return false;
         
-        if (!inventory.HasItem(item, quantity))
+        if (slotIndex >= 0)
+        {
+            InventoryItem invItem = inventory.GetItemAt(slotIndex);
+            if (invItem == null || invItem.IsEmpty() || invItem.item != item || invItem.quantity < quantity)
+                return false;
+        }
+        else if (!inventory.HasItem(item, quantity))
             return false;
         
-        // Use the consumable
         bool wasUsed = false;
         if (item is ConsumableItem consumable)
         {
@@ -1121,12 +1184,13 @@ public class ProceduralCharacterController : MonoBehaviour
                 if (consumable.Use(this))
                 {
                     wasUsed = true;
-                    inventory.RemoveItem(item, 1);
+                    if (slotIndex >= 0)
+                        inventory.RemoveItemAt(slotIndex, 1);
+                    else
+                        inventory.RemoveItem(item, 1);
                 }
                 else
-                {
-                    break; // Stop if use failed
-                }
+                    break;
             }
         }
         
@@ -1134,20 +1198,29 @@ public class ProceduralCharacterController : MonoBehaviour
     }
     
     /// <summary>
-    /// Use a consumable item on a specific limb (e.g. after user selected a limb on the body outline). Removes one from inventory if successful.
+    /// Use a consumable item on a specific limb. When slotIndex >= 0, removes from that slot (the selected stack); otherwise from first stack.
     /// </summary>
-    public bool UseConsumableOnLimb(Item item, LimbType limbType, int quantity = 1)
+    public bool UseConsumableOnLimb(Item item, LimbType limbType, int quantity = 1, int slotIndex = -1)
     {
         if (inventory == null || item == null)
             return false;
         if (item.itemType != Item.ItemType.Consumable)
             return false;
-        if (!inventory.HasItem(item, quantity))
+        if (slotIndex >= 0)
+        {
+            InventoryItem invItem = inventory.GetItemAt(slotIndex);
+            if (invItem == null || invItem.IsEmpty() || invItem.item != item || invItem.quantity < quantity)
+                return false;
+        }
+        else if (!inventory.HasItem(item, quantity))
             return false;
         
         if (item is ConsumableItem consumable && consumable.UseOnLimb(this, limbType))
         {
-            inventory.RemoveItem(item, 1);
+            if (slotIndex >= 0)
+                inventory.RemoveItemAt(slotIndex, 1);
+            else
+                inventory.RemoveItem(item, 1);
             return true;
         }
         return false;
@@ -1458,9 +1531,30 @@ public class ProceduralCharacterController : MonoBehaviour
         }
     }
     
-    // Apply damage to a specific limb
-    public float ApplyDamageToLimb(LimbType limbType, float amount)
+    // Apply damage to a specific limb (with optional damage type for armor mitigation and part status)
+    public float ApplyDamageToLimb(LimbType limbType, float amount, Weapon.DamageType damageType = Weapon.DamageType.Generic)
     {
+        // Record last damage type for this limb (for body-part UI wording)
+        lastDamageTypeByLimb[limbType] = damageType;
+        // Track all damage types that have affected this limb
+        if (!damageTypesByLimb.TryGetValue(limbType, out HashSet<Weapon.DamageType> set))
+        {
+            set = new HashSet<Weapon.DamageType>();
+            damageTypesByLimb[limbType] = set;
+        }
+        set.Add(damageType);
+
+        // Blunt trauma: bashed limbs take more damage from all sources
+        amount *= GetBluntTraumaVulnerabilityMultiplier(limbType);
+
+        // Apply clothing mitigation (negative = more damage)
+        if (clothingController != null)
+        {
+            float mitigation = clothingController.GetDamageMitigationForLimb(limbType, damageType);
+            float mult = Mathf.Clamp(1f - mitigation, 0.01f, 2f);
+            amount *= mult;
+        }
+
         float actualDamage = 0f;
         float currentHealthAfter = 0f;
         float maxHealthForPart = 0f;
@@ -1475,15 +1569,24 @@ public class ProceduralCharacterController : MonoBehaviour
             currentHealthAfter = torsoHealth;
             maxHealthForPart = torsoMaxHealth;
             
+            if (damageType == Weapon.DamageType.Blunt && actualDamage > 0f)
+            {
+                if (!bluntTraumaByLimb.ContainsKey(limbType)) bluntTraumaByLimb[limbType] = 0f;
+                bluntTraumaByLimb[limbType] += actualDamage;
+            }
+            
             // Fire Torso health changed event
             OnLimbHealthChanged?.Invoke(LimbType.Torso, torsoHealth, torsoMaxHealth);
             
             // Update overall character health (torso affects overall health)
             UpdateOverallHealth();
             
-            if (logDamageToConsole && actualDamage > 0f)
-                Debug.Log($"[Damage] {gameObject.name} | {limbType}: {actualDamage:F1} (current: {currentHealthAfter:F0}/{maxHealthForPart:F0})");
-            
+            if (actualDamage > 0f)
+            {
+                AddPainToLimb(limbType, actualDamage);
+                if (logDamageToConsole)
+                    Debug.Log($"[Damage] {gameObject.name} | {limbType}: {actualDamage:F1} (current: {currentHealthAfter:F0}/{maxHealthForPart:F0})");
+            }
             return actualDamage;
         }
         
@@ -1491,6 +1594,13 @@ public class ProceduralCharacterController : MonoBehaviour
         if (limbMap.TryGetValue(limbType, out ProceduralLimb limb))
         {
             actualDamage = limb.TakeDamage(amount);
+            if (damageType == Weapon.DamageType.Blunt && actualDamage > 0f)
+            {
+                if (!bluntTraumaByLimb.ContainsKey(limbType)) bluntTraumaByLimb[limbType] = 0f;
+                bluntTraumaByLimb[limbType] += actualDamage;
+            }
+            if (actualDamage > 0f)
+                AddPainToLimb(limbType, actualDamage);
             if (logDamageToConsole && actualDamage > 0f)
             {
                 float current = limb.GetCurrentHealth();
@@ -1500,6 +1610,71 @@ public class ProceduralCharacterController : MonoBehaviour
             return actualDamage;
         }
         return 0f;
+    }
+
+    private float GetBluntTraumaVulnerabilityMultiplier(LimbType limbType)
+    {
+        float maxHealth = limbType == LimbType.Torso ? GetTorsoMaxHealth() : (GetLimb(limbType) != null ? GetLimb(limbType).maxHealth : 1f);
+        if (maxHealth < 1f) maxHealth = 1f;
+        float trauma = bluntTraumaByLimb.TryGetValue(limbType, out float t) ? t : 0f;
+        float normalized = trauma / maxHealth;
+        float bonus = Mathf.Min(normalized * bluntTraumaVulnerabilityScale, bluntTraumaVulnerabilityCap);
+        return 1f + bonus;
+    }
+
+    /// <summary>
+    /// Laceration severity tier from limb health: 0 = light, 1 = medium, 2 = heavy. Used by consumables (bandage vs stitches).
+    /// </summary>
+    public int GetLacerationSeverityTierForLimb(LimbType limb)
+    {
+        float healthPercent = limb == LimbType.Torso
+            ? (GetTorsoMaxHealth() > 0f ? GetTorsoHealth() / GetTorsoMaxHealth() : 1f)
+            : GetLimbHealthPercentage(limb);
+        if (healthPercent > lacerationLightThreshold) return 0;
+        if (healthPercent > lacerationHeavyThreshold) return 1;
+        return 2;
+    }
+
+    /// <summary>
+    /// Get the last damage type that hit this limb (for UI wording, e.g. "badly slashed"). Returns null if never hit.
+    /// </summary>
+    public Weapon.DamageType? GetLastDamageTypeForLimb(LimbType limb)
+    {
+        return lastDamageTypeByLimb.TryGetValue(limb, out Weapon.DamageType type) ? (Weapon.DamageType?)type : null;
+    }
+
+    /// <summary>
+    /// Get all damage types that have affected this limb (Stab, Slash, Blunt; excludes Generic). For UI condition list.
+    /// </summary>
+    public IReadOnlyCollection<Weapon.DamageType> GetDamageTypesForLimb(LimbType limb)
+    {
+        if (!damageTypesByLimb.TryGetValue(limb, out HashSet<Weapon.DamageType> set))
+            return Array.Empty<Weapon.DamageType>();
+        return set.Where(t => t != Weapon.DamageType.Generic).ToList();
+    }
+
+    /// <summary>
+    /// Get current pain value for this limb (0 to maxPainPerLimb).
+    /// </summary>
+    public float GetPainForLimb(LimbType limb)
+    {
+        return painByLimb.TryGetValue(limb, out float p) ? Mathf.Min(p, maxPainPerLimb) : 0f;
+    }
+
+    /// <summary>
+    /// Get pain as 0–1 for UI (e.g. pain meter).
+    /// </summary>
+    public float GetPainPercentForLimb(LimbType limb)
+    {
+        if (maxPainPerLimb <= 0f) return 0f;
+        return Mathf.Clamp01(GetPainForLimb(limb) / maxPainPerLimb);
+    }
+
+    private void AddPainToLimb(LimbType limbType, float actualDamage)
+    {
+        float add = actualDamage * painPerDamage;
+        painByLimb.TryGetValue(limbType, out float current);
+        painByLimb[limbType] = Mathf.Min(current + add, maxPainPerLimb * 1.5f); // allow slight overcap for display
     }
     
     // Apply damage to all limbs
@@ -1738,19 +1913,19 @@ public class ProceduralCharacterController : MonoBehaviour
     }
     
     // Apply damage using probability-based limb selection
-    public float TakeDamageWithProbability(float baseDamage, List<Weapon.LimbHitProbability> hitProbabilities)
+    public float TakeDamageWithProbability(float baseDamage, List<Weapon.LimbHitProbability> hitProbabilities, Weapon.DamageType damageType = Weapon.DamageType.Generic)
     {
         if (hitProbabilities == null || hitProbabilities.Count == 0)
         {
             // Default to torso damage if no probabilities provided
-            return ApplyDamageToLimb(LimbType.Torso, baseDamage);
+            return ApplyDamageToLimb(LimbType.Torso, baseDamage, damageType);
         }
         
         // Select random limb based on probabilities
         LimbType selectedLimb = SelectRandomLimb(hitProbabilities);
         
         // Apply damage to selected limb
-        float damageDealt = ApplyDamageToLimb(selectedLimb, baseDamage);
+        float damageDealt = ApplyDamageToLimb(selectedLimb, baseDamage, damageType);
         
         return damageDealt;
     }
@@ -1761,5 +1936,18 @@ public class ProceduralCharacterController : MonoBehaviour
         if (weapon == null)
             return 0f;
         return weapon.TakeDamageWithWeapon(this);
+    }
+
+    /// <summary>
+    /// Called by BleedingController when blood level reaches 0. Triggers death, puts character in spectator mode.
+    /// SpectatorController should release control in response to OnDeath.
+    /// </summary>
+    public void TriggerDeathFromBloodLoss()
+    {
+        if (IsDead)
+            return;
+        IsDead = true;
+        SetSpectatorMode(true); // Stop movement/control
+        OnDeath?.Invoke();
     }
 }

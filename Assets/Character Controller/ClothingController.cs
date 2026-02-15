@@ -364,6 +364,26 @@ public class ClothingController : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Get total damage mitigation for a limb and damage type from all equipped clothing. Negative values mean more damage.
+    /// </summary>
+    public float GetDamageMitigationForLimb(ProceduralCharacterController.LimbType limb, Weapon.DamageType damageType)
+    {
+        float total = 0f;
+        foreach (var kvp in equippedByPart)
+        {
+            Item item = kvp.Value.item;
+            if (item == null || item.damageMitigationPerLimb == null)
+                continue;
+            foreach (var entry in item.damageMitigationPerLimb)
+            {
+                if (entry.limb == limb)
+                    total += entry.GetMitigationFor(damageType);
+            }
+        }
+        return total;
+    }
+
     private void ReturnToInventoryIfNeeded(Item item)
     {
         // Only return if this item was removed from inventory AND is no longer equipped anywhere.

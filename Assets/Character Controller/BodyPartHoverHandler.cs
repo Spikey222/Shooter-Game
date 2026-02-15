@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 
 /// <summary>
-/// Click-to-lock body part inspection UI. Click a limb to show part name, condition (Excellent/Fine/Bad),
-/// bleeding status (Light/Heavy), and per-limb condition bar. Also drives overall condition bar.
+/// Click-to-lock body part inspection UI. Click a limb to show part name and statistical readout
+/// (HP %, bleed value, severity 0–2, damage type code). Also drives overall and per-limb condition bars.
 /// </summary>
 [RequireComponent(typeof(BodyOutlineUI))]
 public class BodyPartHoverHandler : MonoBehaviour
@@ -23,6 +24,12 @@ public class BodyPartHoverHandler : MonoBehaviour
     [Header("Limb Condition Bar (per selected limb)")]
     public Image limbConditionBarImage;
     public TextMeshProUGUI limbConditionBarText;
+
+    [Header("Blood Level Bar (total blood - death when empty)")]
+    [Tooltip("Fill image for blood bar (assign BloodBarFill from BloodBarPanel in Inventory UI)")]
+    public Image bloodBarImage;
+    [Tooltip("Text for blood bar (assign BloodBarText from BloodBarPanel)")]
+    public TextMeshProUGUI bloodBarText;
 
     [Header("Deselect")]
     [Tooltip("Optional: Graphic (e.g. transparent Image) that clears selection when clicked.")]
@@ -61,10 +68,13 @@ public class BodyPartHoverHandler : MonoBehaviour
     // Bar smoothing (curve-style)
     private float targetOverallFill;
     private float targetLimbFill;
+    private float targetBloodFill;
     private float smoothOverallFill;
     private float smoothLimbFill;
+    private float smoothBloodFill;
     private float overallFillVelocity;
     private float limbFillVelocity;
+    private float bloodFillVelocity;
 
     private void Awake()
     {
@@ -113,6 +123,8 @@ public class BodyPartHoverHandler : MonoBehaviour
             characterController.OnHealthChanged -= OnHealthChanged;
             characterController.OnLimbHealthChanged -= OnLimbHealthChanged;
         }
+        if (bleedingController != null)
+            bleedingController.OnBloodLevelChanged -= OnBloodLevelChanged;
 
         characterController = controller;
         bleedingController = characterController != null ? characterController.GetComponent<BleedingController>() : null;
@@ -121,7 +133,10 @@ public class BodyPartHoverHandler : MonoBehaviour
         {
             characterController.OnHealthChanged += OnHealthChanged;
             characterController.OnLimbHealthChanged += OnLimbHealthChanged;
+            if (bleedingController != null)
+                bleedingController.OnBloodLevelChanged += OnBloodLevelChanged;
             UpdateOverallConditionBar();
+            UpdateBloodBar();
         }
         else
         {
@@ -215,13 +230,16 @@ public class BodyPartHoverHandler : MonoBehaviour
         if (partNameText != null)
             partNameText.text = BodyOutlineUI.GetLimbDisplayName(limbType);
 
-        string condition = GetConditionString(healthPercent);
-        string bleeding = GetBleedingString(limbType);
+        int hpPercent = Mathf.RoundToInt(healthPercent * 100f);
+        string bleedCategory = GetBleedCategory(limbType);
+        string conditionsLine = GetAllConditionWording(limbType, healthPercent);
+        float painPercent = characterController != null ? characterController.GetPainPercentForLimb(limbType) : 0f;
+
         if (descriptionText != null)
-            descriptionText.text = string.IsNullOrEmpty(bleeding) ? $"Condition: {condition}." : $"Condition: {condition}. {bleeding}";
+            descriptionText.text = FormatStatisticalDescription(bleedCategory, conditionsLine, painPercent);
 
         if (limbConditionBarText != null)
-            limbConditionBarText.text = $"{Mathf.RoundToInt(healthPercent * 100)}%";
+            limbConditionBarText.text = $"{hpPercent}%";
     }
 
     private float GetLimbHealthPercent(ProceduralCharacterController.LimbType limbType)
@@ -236,21 +254,58 @@ public class BodyPartHoverHandler : MonoBehaviour
         return characterController.GetLimbHealthPercentage(limbType);
     }
 
-    private string GetConditionString(float healthPercent)
+    private string GetBleedCategory(ProceduralCharacterController.LimbType limbType)
     {
-        if (healthPercent > damagedThreshold) return "Excellent";
-        if (healthPercent > criticalThreshold) return "Fine";
-        return "Bad";
+        if (bleedingController == null) return "None";
+        float intensity = bleedingController.GetBleedIntensityFor(limbType);
+        if (intensity <= 0f) return "None";
+        if (intensity >= bleedingController.heavyBleedThreshold) return "Heavy Bleed";
+        if (intensity >= bleedingController.lightBleedThreshold) return "Light Bleed";
+        return "None";
     }
 
-    private string GetBleedingString(ProceduralCharacterController.LimbType limbType)
+    private int GetSeverityTier(float healthPercent)
     {
-        if (bleedingController == null) return "";
-        float intensity = bleedingController.GetBleedIntensityFor(limbType);
-        if (intensity <= 0f) return "";
-        if (intensity >= bleedingController.heavyBleedThreshold) return "Heavy bleeding.";
-        if (intensity >= bleedingController.lightBleedThreshold) return "Light bleeding.";
-        return "";
+        if (healthPercent > damagedThreshold) return 0;
+        if (healthPercent > criticalThreshold) return 1;
+        return 2;
+    }
+
+    /// <summary>
+    /// Wording for one damage type at current severity (tier 0 = minor, 1 = moderate, 2 = bad).
+    /// </summary>
+    private static string GetConditionWordingForDamageType(Weapon.DamageType type, int severityTier)
+    {
+        if (type == Weapon.DamageType.Generic)
+        {
+            return severityTier switch { 0 => "Excellent", 1 => "Fine", _ => "Bad" };
+        }
+        switch (type)
+        {
+            case Weapon.DamageType.Stab:
+                return severityTier switch { 0 => "minor puncture", 1 => "punctured", _ => "badly punctured" };
+            case Weapon.DamageType.Slash:
+                return severityTier switch { 0 => "minor slicing", 1 => "sliced", _ => "badly slashed" };
+            case Weapon.DamageType.Blunt:
+                return severityTier switch { 0 => "minor bruising", 1 => "bruised", _ => "badly bruised" };
+            default:
+                return severityTier switch { 0 => "Excellent", 1 => "Fine", _ => "Bad" };
+        }
+    }
+
+    private string GetAllConditionWording(ProceduralCharacterController.LimbType limbType, float healthPercent)
+    {
+        if (characterController == null) return "—";
+        var types = characterController.GetDamageTypesForLimb(limbType);
+        if (types == null || types.Count == 0) return "—";
+        int tier = GetSeverityTier(healthPercent);
+        return string.Join(", ", types.Select(t => GetConditionWordingForDamageType(t, tier)));
+    }
+
+    private static string FormatStatisticalDescription(string bleedCategory, string conditionsLine, float painPercent)
+    {
+        int painPct = Mathf.RoundToInt(painPercent * 100f);
+        return $"Bleed: {bleedCategory}\nConditions: {conditionsLine}\nPain: {painPct}%";
     }
 
     private void OnHealthChanged(float current, float max)
@@ -263,6 +318,11 @@ public class BodyPartHoverHandler : MonoBehaviour
         if (selectedLimb == limbType)
             UpdateLimbDisplay();
         UpdateOverallConditionBar();
+    }
+
+    private void OnBloodLevelChanged(float current, float max)
+    {
+        UpdateBloodBar();
     }
 
     private void UpdateOverallConditionBar()
@@ -281,20 +341,37 @@ public class BodyPartHoverHandler : MonoBehaviour
             conditionBarText.text = $"{Mathf.RoundToInt(targetOverallFill * 100)}%";
     }
 
+    private void UpdateBloodBar()
+    {
+        if (bleedingController == null)
+        {
+            targetBloodFill = 0f;
+            return;
+        }
+        targetBloodFill = bleedingController.GetBloodLevelPercent();
+        if (bloodBarText != null)
+            bloodBarText.text = $"{Mathf.RoundToInt(targetBloodFill * 100)}%";
+    }
+
     private void UpdateBarSmoothing()
     {
         smoothOverallFill = Mathf.SmoothDamp(smoothOverallFill, targetOverallFill, ref overallFillVelocity, barSmoothTime);
         smoothLimbFill = Mathf.SmoothDamp(smoothLimbFill, targetLimbFill, ref limbFillVelocity, barSmoothTime);
+        smoothBloodFill = Mathf.SmoothDamp(smoothBloodFill, targetBloodFill, ref bloodFillVelocity, barSmoothTime);
 
         if (conditionBarImage != null)
             conditionBarImage.fillAmount = smoothOverallFill;
         if (limbConditionBarImage != null)
             limbConditionBarImage.fillAmount = smoothLimbFill;
+        if (bloodBarImage != null)
+            bloodBarImage.fillAmount = smoothBloodFill;
 
         if (characterController == null && conditionBarText != null)
             conditionBarText.text = "—";
         if (!selectedLimb.HasValue && limbConditionBarText != null)
             limbConditionBarText.text = "—";
+        if (bleedingController == null && bloodBarText != null)
+            bloodBarText.text = "—";
     }
 
     private void UpdateSelectionPulsation()
@@ -326,10 +403,17 @@ public class BodyPartHoverHandler : MonoBehaviour
         if (conditionBarText != null) conditionBarText.text = "—";
     }
 
+    private void ClearBloodBar()
+    {
+        targetBloodFill = 0f;
+        if (bloodBarText != null) bloodBarText.text = "—";
+    }
+
     private void ClearAllDisplays()
     {
         ClearSelection();
         ClearOverallBar();
+        ClearBloodBar();
     }
 
     private void OnDestroy()
@@ -339,6 +423,8 @@ public class BodyPartHoverHandler : MonoBehaviour
             characterController.OnHealthChanged -= OnHealthChanged;
             characterController.OnLimbHealthChanged -= OnLimbHealthChanged;
         }
+        if (bleedingController != null)
+            bleedingController.OnBloodLevelChanged -= OnBloodLevelChanged;
     }
 
     private class LimbClickTarget : MonoBehaviour, IPointerClickHandler

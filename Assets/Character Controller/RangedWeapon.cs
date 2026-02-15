@@ -15,7 +15,7 @@ public class RangedWeapon : Weapon
     {
         if (target == null)
             return 0f;
-        return target.TakeDamageWithProbability(baseDamage, hitProbabilities);
+        return target.TakeDamageWithProbability(baseDamage, hitProbabilities, damageType);
     }
 
     public static void NormalizeProbabilities(List<LimbHitProbability> probabilities)

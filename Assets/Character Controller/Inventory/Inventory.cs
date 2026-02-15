@@ -32,7 +32,40 @@ public class Inventory : MonoBehaviour
     
     private void Awake()
     {
+        NormalizeStacks();
         currentWeight = CalculateWeight();
+    }
+    
+    /// <summary>
+    /// Split any stack that exceeds the item's maxStackSize into multiple stacks (e.g. serialized 17 with max 10 becomes 10 + 7).
+    /// Applies to all item types (Consumable, Weapon, Clothing, Other) when maxStackSize > 1.
+    /// Call on load so inspector-set or saved quantities respect stack limits.
+    /// </summary>
+    public void NormalizeStacks()
+    {
+        var rebuilt = new List<InventoryItem>();
+        foreach (var inv in items)
+        {
+            if (inv == null || inv.IsEmpty() || inv.item == null) continue;
+            if (!inv.item.IsStackable() || inv.quantity <= inv.item.maxStackSize)
+            {
+                rebuilt.Add(inv);
+                continue;
+            }
+            int remaining = inv.quantity;
+            int maxStack = inv.item.maxStackSize;
+            while (remaining > 0)
+            {
+                int chunk = Mathf.Min(remaining, maxStack);
+                rebuilt.Add(new InventoryItem(inv.item, chunk));
+                remaining -= chunk;
+            }
+        }
+        items.Clear();
+        foreach (var inv in rebuilt)
+            items.Add(inv);
+        UpdateWeight();
+        OnInventoryChanged?.Invoke();
     }
     
     /// <summary>
@@ -86,69 +119,72 @@ public class Inventory : MonoBehaviour
     
     /// <summary>
     /// Add an item to the inventory. Returns true if successfully added.
+    /// For stackable items (any type: Consumable, Weapon, Clothing, Other with maxStackSize > 1), fills existing stacks then creates new stacks up to maxStackSize each until quantity or weight limit is reached.
     /// </summary>
     public bool AddItem(Item item, int quantity = 1)
     {
         if (item == null || quantity <= 0)
             return false;
         
-        // Check if we can add the full quantity
+        if (item.IsStackable())
+        {
+            int remaining = quantity;
+            while (remaining > 0)
+            {
+                if (currentWeight + item.GetWeight(1) > maxWeight)
+                    break;
+                
+                InventoryItem stackWithSpace = FindStackWithSpace(item);
+                int toAdd;
+                if (stackWithSpace != null)
+                {
+                    int space = stackWithSpace.item.maxStackSize - stackWithSpace.quantity;
+                    toAdd = Mathf.Min(remaining, space);
+                }
+                else
+                {
+                    toAdd = Mathf.Min(remaining, item.maxStackSize);
+                }
+                
+                float addWeight = item.GetWeight(toAdd);
+                if (currentWeight + addWeight > maxWeight)
+                {
+                    int fitByWeight = Mathf.Max(0, Mathf.FloorToInt((maxWeight - currentWeight) / item.weight));
+                    if (fitByWeight <= 0) break;
+                    toAdd = Mathf.Min(toAdd, fitByWeight);
+                    addWeight = item.GetWeight(toAdd);
+                }
+                if (toAdd <= 0) break;
+                
+                if (stackWithSpace != null)
+                    stackWithSpace.quantity += toAdd;
+                else
+                    items.Add(new InventoryItem(item, toAdd));
+                remaining -= toAdd;
+                UpdateWeight();
+            }
+            OnInventoryChanged?.Invoke();
+            return remaining < quantity;
+        }
+        
+        // Non-stackable: add one at a time
         float additionalWeight = item.GetWeight(quantity);
         if (currentWeight + additionalWeight > maxWeight)
         {
-            // Try to add what we can fit
             int canFit = CalculateMaxQuantityThatFits(item, quantity);
-            if (canFit <= 0)
-            {
-                return false;
-            }
+            if (canFit <= 0) return false;
             quantity = canFit;
         }
-        
-        // Try to stack with existing item if stackable
-        if (item.IsStackable())
+        for (int i = 0; i < quantity; i++)
         {
-            InventoryItem existingItem = FindItem(item);
-            if (existingItem != null)
-            {
-                int added = existingItem.TryAddQuantity(quantity);
-                if (added > 0)
-                {
-                    UpdateWeight();
-                    OnInventoryChanged?.Invoke();
-                    return true;
-                }
-            }
+            float singleWeight = item.GetWeight(1);
+            if (currentWeight + singleWeight > maxWeight) break;
+            items.Add(new InventoryItem(item, 1));
+            currentWeight += singleWeight;
         }
-        
-        // Add as new item if not stackable or no existing stack found
-        // For non-stackable items, add one at a time
-        if (!item.IsStackable())
-        {
-            for (int i = 0; i < quantity; i++)
-            {
-                float singleWeight = item.GetWeight(1);
-                if (currentWeight + singleWeight > maxWeight)
-                {
-                    break; // Can't fit more
-                }
-                
-                items.Add(new InventoryItem(item, 1));
-                currentWeight += singleWeight;
-            }
-            
-            UpdateWeight();
-            OnInventoryChanged?.Invoke();
-            return quantity > 0;
-        }
-        else
-        {
-            // Stackable item - add all at once
-            items.Add(new InventoryItem(item, quantity));
-            UpdateWeight();
-            OnInventoryChanged?.Invoke();
-            return true;
-        }
+        UpdateWeight();
+        OnInventoryChanged?.Invoke();
+        return true;
     }
     
     /// <summary>
@@ -178,33 +214,31 @@ public class Inventory : MonoBehaviour
     }
     
     /// <summary>
-    /// Remove an item from inventory. Returns true if successfully removed.
+    /// Remove an item from inventory (from first stack, then next, etc.). Returns true if any was removed.
     /// </summary>
     public bool RemoveItem(Item item, int quantity = 1)
     {
         if (item == null || quantity <= 0)
             return false;
-        
-        InventoryItem invItem = FindItem(item);
-        if (invItem == null)
-            return false;
-        
-        int removed = invItem.RemoveQuantity(quantity);
-        
-        // Remove from list if empty
-        if (invItem.IsEmpty())
+        int toRemove = quantity;
+        bool anyRemoved = false;
+        while (toRemove > 0)
         {
-            items.Remove(invItem);
+            InventoryItem invItem = FindItem(item);
+            if (invItem == null) break;
+            int removed = invItem.RemoveQuantity(toRemove);
+            if (removed <= 0) break;
+            toRemove -= removed;
+            anyRemoved = true;
+            if (invItem.IsEmpty())
+                items.Remove(invItem);
         }
-        
-        if (removed > 0)
+        if (anyRemoved)
         {
             UpdateWeight();
             OnInventoryChanged?.Invoke();
-            return true;
         }
-        
-        return false;
+        return anyRemoved;
     }
     
     /// <summary>
@@ -237,14 +271,23 @@ public class Inventory : MonoBehaviour
     }
     
     /// <summary>
-    /// Find an item in the inventory by Item reference
+    /// Find the first stack of this item in the inventory.
     /// </summary>
     public InventoryItem FindItem(Item item)
     {
         if (item == null)
             return null;
-        
         return items.FirstOrDefault(invItem => invItem != null && invItem.item == item);
+    }
+    
+    /// <summary>
+    /// Find a stack of this item that has space for more (quantity &lt; maxStackSize).
+    /// </summary>
+    private InventoryItem FindStackWithSpace(Item item)
+    {
+        if (item == null || !item.IsStackable())
+            return null;
+        return items.FirstOrDefault(invItem => invItem != null && invItem.item == item && invItem.quantity < invItem.item.maxStackSize);
     }
     
     /// <summary>
@@ -258,12 +301,16 @@ public class Inventory : MonoBehaviour
     }
     
     /// <summary>
-    /// Get quantity of a specific item in inventory
+    /// Get total quantity of a specific item across all stacks.
     /// </summary>
     public int GetItemQuantity(Item item)
     {
-        InventoryItem invItem = FindItem(item);
-        return invItem != null ? invItem.quantity : 0;
+        if (item == null) return 0;
+        int total = 0;
+        foreach (var invItem in items)
+            if (invItem != null && invItem.item == item)
+                total += invItem.quantity;
+        return total;
     }
     
     /// <summary>

@@ -316,7 +316,7 @@ public class WeaponOneHanded : Weapon
         var contactLimbType = target.GetLimbTypeForCollider(contactCollider);
         if (contactLimbType == null)
         {
-            target.ApplyDamageToLimb(ProceduralCharacterController.LimbType.Torso, damage);
+            target.ApplyDamageToLimb(ProceduralCharacterController.LimbType.Torso, damage, damageType);
             return;
         }
 
@@ -333,7 +333,7 @@ public class WeaponOneHanded : Weapon
             limbToDamage = contactLimbType.Value;
         }
 
-        target.ApplyDamageToLimb(limbToDamage, damage);
+        target.ApplyDamageToLimb(limbToDamage, damage, damageType);
     }
 
     /// <summary>

@@ -94,42 +94,44 @@ public class ProceduralLimb : MonoBehaviour
     }
     
     // Method to set a new target angle (used for animation or control)
+    // Respects the joint's configured angle limits - does not modify them.
     public void SetTargetAngle(float newAngle)
     {
         if (joint != null)
         {
-            // Update joint limits around the new target angle
-            joint.useLimits = true;
-            JointAngleLimits2D limits = joint.limits;
-            limits.min = newAngle - 15f; // Allow some movement around target
-            limits.max = newAngle + 15f;
-            joint.limits = limits;
+            // Clamp target to joint's configured limits so we never ask motor to drive outside allowed range
+            float clampedTarget = newAngle;
+            if (joint.useLimits)
+            {
+                clampedTarget = Mathf.Clamp(newAngle, joint.limits.min, joint.limits.max);
+            }
             
-            // Enable motor to move toward the target angle
+            // Enable motor to move toward the target angle (limits constrain movement)
             joint.useMotor = true;
             JointMotor2D motor = joint.motor;
             motor.maxMotorTorque = 100f; // Increased for more punchy movement
             
             // Calculate current angle and set motor direction
             float currentAngle = joint.jointAngle;
-            float angleDifference = Mathf.DeltaAngle(currentAngle, newAngle);
+            float angleDifference = Mathf.DeltaAngle(currentAngle, clampedTarget);
             motor.motorSpeed = angleDifference * 5f; // Adjust multiplier as needed
             
             joint.motor = motor;
         }
     }
     
-    // Method to set an exact angle with very tight limits (for spectator mode head positioning)
+    // Method to set an exact angle (for spectator mode head positioning)
+    // Respects the joint's configured angle limits - does not modify them.
     public void SetExactAngle(float exactAngle)
     {
         if (joint != null)
         {
-            // Update joint limits with very tight constraints
-            joint.useLimits = true;
-            JointAngleLimits2D limits = joint.limits;
-            limits.min = exactAngle - 0.5f; // Very tight limits
-            limits.max = exactAngle + 0.5f;
-            joint.limits = limits;
+            // Clamp target to joint's configured limits
+            float clampedTarget = exactAngle;
+            if (joint.useLimits)
+            {
+                clampedTarget = Mathf.Clamp(exactAngle, joint.limits.min, joint.limits.max);
+            }
             
             // Enable motor with higher torque for precise control
             joint.useMotor = true;
@@ -138,7 +140,7 @@ public class ProceduralLimb : MonoBehaviour
             
             // Calculate current angle and set motor direction
             float currentAngle = joint.jointAngle;
-            float angleDifference = Mathf.DeltaAngle(currentAngle, exactAngle);
+            float angleDifference = Mathf.DeltaAngle(currentAngle, clampedTarget);
             motor.motorSpeed = angleDifference * 10f; // Higher multiplier for faster correction
             
             joint.motor = motor;
@@ -162,7 +164,8 @@ public class ProceduralLimb : MonoBehaviour
         smoothRotationCoroutine = StartCoroutine(SmoothRotateToZeroCoroutine());
     }
     
-    // Coroutine that handles the smooth rotation to zero
+    // Coroutine that handles the smooth rotation to zero.
+    // Respects the joint's configured angle limits - does not modify them.
     private System.Collections.IEnumerator SmoothRotateToZeroCoroutine()
     {
         if (joint != null)
@@ -172,11 +175,18 @@ public class ProceduralLimb : MonoBehaviour
             float duration = 0.8f; // Longer duration for smoother rotation
             float elapsedTime = 0f;
             
+            // Clamp target to joint's configured limits (zero may be outside limits)
+            float targetAngle = 0f;
+            if (joint.useLimits)
+            {
+                targetAngle = Mathf.Clamp(0f, joint.limits.min, joint.limits.max);
+            }
+            
             // Get rigidbody for velocity control
             Rigidbody2D rb = GetComponent<Rigidbody2D>();
             float initialAngularVelocity = rb != null ? rb.angularVelocity : 0f;
             
-            // Use smooth easing function for natural movement
+            // Use smooth easing function for natural movement - motor drives toward target
             while (elapsedTime < duration)
             {
                 // Calculate progress with smooth easing
@@ -184,8 +194,8 @@ public class ProceduralLimb : MonoBehaviour
                 // Smoothstep for ease-in-out effect
                 t = t * t * (3f - 2f * t); 
                 
-                // Calculate target angle with smooth interpolation
-                float targetAngle = Mathf.Lerp(startAngle, 0f, t);
+                // Interpolate target along path (start -> targetAngle)
+                float currentTarget = Mathf.Lerp(startAngle, targetAngle, t);
                 
                 // Gradually reduce angular velocity to prevent jolt
                 if (rb != null)
@@ -194,73 +204,48 @@ public class ProceduralLimb : MonoBehaviour
                     rb.angularVelocity = velocityReduction;
                 }
                 
-                // Set joint limits with gradually decreasing range
-                JointAngleLimits2D limits = joint.limits;
-                float range = Mathf.Lerp(10f, 1f, t); // Gradually tighten limits
-                limits.min = targetAngle - range;
-                limits.max = targetAngle + range;
-                joint.limits = limits;
-                
-                // Gradually increase motor torque for smoother end control
+                // Motor drives toward interpolated target (limits constrain movement)
                 joint.useMotor = true;
                 JointMotor2D motor = joint.motor;
-                motor.maxMotorTorque = Mathf.Lerp(30f, 80f, t); // Gradually increase torque
+                motor.maxMotorTorque = Mathf.Lerp(30f, 80f, t);
                 
-                // Calculate motor speed with decreasing multiplier near end
                 float currentAngle = joint.jointAngle;
-                float angleDifference = Mathf.DeltaAngle(currentAngle, targetAngle);
-                float speedMultiplier = Mathf.Lerp(8f, 3f, t); // Reduce multiplier near end
+                float angleDifference = Mathf.DeltaAngle(currentAngle, currentTarget);
+                float speedMultiplier = Mathf.Lerp(8f, 3f, t);
                 motor.motorSpeed = angleDifference * speedMultiplier;
                 joint.motor = motor;
                 
-                // Wait for next frame
                 elapsedTime += Time.deltaTime;
                 yield return null;
             }
             
-            // Final phase - very gentle approach to zero
+            // Final phase - gentle approach to target (within limits)
             float finalDuration = 0.3f;
             float finalElapsedTime = 0f;
             
             while (finalElapsedTime < finalDuration)
             {
-                // Very gentle approach to zero
-                float t = finalElapsedTime / finalDuration;
-                
-                // Set very gentle limits
-                JointAngleLimits2D limits = joint.limits;
-                limits.min = -0.5f;
-                limits.max = 0.5f;
-                joint.limits = limits;
-                
-                // Very gentle motor settings
+                joint.useMotor = true;
                 JointMotor2D motor = joint.motor;
-                motor.maxMotorTorque = 30f; // Lower torque to prevent jolt
+                motor.maxMotorTorque = 30f;
                 
-                // Gentle speed toward zero
                 float currentAngle = joint.jointAngle;
-                motor.motorSpeed = currentAngle * -2f; // Very gentle correction
+                motor.motorSpeed = Mathf.DeltaAngle(currentAngle, targetAngle) * 2f;
                 joint.motor = motor;
                 
-                // Ensure zero angular velocity
                 if (rb != null)
                 {
-                    rb.angularVelocity = 0f;
+                    rb.angularVelocity = Mathf.Lerp(rb.angularVelocity, 0f, Time.deltaTime * 5f);
                 }
                 
                 finalElapsedTime += Time.deltaTime;
                 yield return null;
             }
             
-            // Final stabilization - just maintain position with minimal force
-            JointAngleLimits2D finalLimits = joint.limits;
-            finalLimits.min = -0.2f;
-            finalLimits.max = 0.2f;
-            joint.limits = finalLimits;
-            
+            // Final stabilization - maintain position with minimal force
             JointMotor2D finalMotor = joint.motor;
-            finalMotor.maxMotorTorque = 10f; // Just enough to maintain position
-            finalMotor.motorSpeed = 0f; // No active rotation
+            finalMotor.maxMotorTorque = 10f;
+            finalMotor.motorSpeed = 0f;
             joint.motor = finalMotor;
         }
     }

@@ -66,10 +66,9 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("Volume for open/close sounds")]
     [Range(0f, 1f)]
     public float audioVolume = 1f;
-
-    [Header("Consumable Audio")]
-    [Tooltip("Sound played when a consumable is successfully used (including bandages).")]
+    [Tooltip("Sound played when a consumable is used (delay timer + this sound). Assign here on the same component that has Open/Close sounds.")]
     public AudioClip consumableUseSound;
+    [Tooltip("Volume for consumable use sound")]
     [Range(0f, 1f)]
     public float consumableUseVolume = 1f;
 
@@ -346,17 +345,21 @@ public class InventoryUI : MonoBehaviour
 
         // Re-apply cooldown after rebuild so delay timer and radial survive UpdateUI
         Item item = invItem.item;
-        if (itemCooldownEndTime.TryGetValue(item, out float endTime) && itemCooldownDuration.TryGetValue(item, out float dur))
+        float endTime = 0f;
+        float dur = 0f;
+        bool hasCD = itemCooldownEndTime.TryGetValue(item, out endTime) && itemCooldownDuration.TryGetValue(item, out dur);
+        float rem = hasCD ? endTime - Time.time : 0f;
+        bool applyRem = hasCD && rem > 0f;
+        if (applyRem)
+            slotUI.StartCooldownWithRemaining(rem, dur);
+        else if (hasCD && rem <= 0f)
         {
-            float rem = endTime - Time.time;
-            if (rem <= 0f)
-            {
-                itemCooldownEndTime.Remove(item);
-                itemCooldownDuration.Remove(item);
-            }
-            else
-                slotUI.StartCooldownWithRemaining(rem, dur);
+            itemCooldownEndTime.Remove(item);
+            itemCooldownDuration.Remove(item);
         }
+        // #region agent log
+        try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_createSlot\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventoryUI.CreateItemSlot\",\"message\":\"Slot created\",\"data\":{\"itemName\":\"" + (item?.name ?? "null") + "\",\"hasCooldownInDict\":" + (hasCD ? "true" : "false") + ",\"rem\":" + rem + ",\"applyRemaining\":" + (applyRem ? "true" : "false") + "},\"hypothesisId\":\"H3\"}\n"); } catch { }
+        // #endregion
     }
     
     /// <summary>
@@ -389,18 +392,16 @@ public class InventoryUI : MonoBehaviour
     /// </summary>
     private void UpdateWeightDisplay(float currentWeight, float maxWeight)
     {
-        float currentLb = currentWeight * PoundsPerKilogram;
-        float maxLb = maxWeight * PoundsPerKilogram;
-
+        // Weights are stored in pounds (Item.weight and Inventory use same unit); display as-is
         if (weightText != null)
         {
-            weightText.text = $"Weight: {currentLb:F1}/{maxLb:F1} lb";
+            weightText.text = $"Weight: {currentWeight:F1}/{maxWeight:F1} lb";
         }
         
         if (weightSlider != null)
         {
-            weightSlider.maxValue = maxLb;
-            weightSlider.value = currentLb;
+            weightSlider.maxValue = maxWeight;
+            weightSlider.value = currentWeight;
         }
     }
 
@@ -443,6 +444,11 @@ public class InventoryUI : MonoBehaviour
         {
             if (invItem.item is ConsumableItem consumable && consumable.requiresLimbTarget)
             {
+                if (IsItemOnCooldown(invItem.item))
+                {
+                    UpdateUI();
+                    return;
+                }
                 if (pendingHealableSlotIndex == slotIndex)
                 {
                     pendingHealableSlotIndex = -1;
@@ -455,12 +461,20 @@ public class InventoryUI : MonoBehaviour
             }
             else
             {
-                bool used = character.UseConsumable(invItem.item, 1);
+                // #region agent log
+                float useTimeVal = invItem.item is ConsumableItem c1 ? c1.useTime : 0f;
+                try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_use\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventoryUI.OnItemSlotClicked\",\"message\":\"Consumable direct use attempt\",\"data\":{\"itemName\":\"" + (invItem.item?.itemName ?? "null") + "\",\"useTime\":" + useTimeVal + ",\"slotIndex\":" + slotIndex + "},\"hypothesisId\":\"H1\"}\n"); } catch { }
+                // #endregion
+                bool used = character.UseConsumable(invItem.item, 1, slotIndex);
+                bool willStart = used && invItem.item is ConsumableItem c2 && c2.useTime > 0f;
+                // #region agent log
+                try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_used\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventoryUI.OnItemSlotClicked\",\"message\":\"After UseConsumable\",\"data\":{\"used\":" + (used ? "true" : "false") + ",\"willStartCooldown\":" + (willStart ? "true" : "false") + "},\"hypothesisId\":\"H1\"}\n"); } catch { }
+                // #endregion
                 if (used)
                 {
-                    PlayConsumableUseSound();
-                    if (invItem.item is ConsumableItem c && c.useTime > 0f)
-                        StartCooldownForSlot(slotIndex, c.useTime);
+                    PlayConsumableUseSound(invItem.item);
+                    if (willStart)
+                        StartCooldownForSlot(slotIndex, (invItem.item as ConsumableItem).useTime);
                 }
                 UpdateUI();
             }
@@ -494,10 +508,15 @@ public class InventoryUI : MonoBehaviour
         if (invItem == null || invItem.IsEmpty())
             return;
         
-        if (invItem.item.itemType == Item.ItemType.Consumable)
+            if (invItem.item.itemType == Item.ItemType.Consumable)
         {
             if (invItem.item is ConsumableItem consumable && consumable.requiresLimbTarget)
             {
+                if (IsItemOnCooldown(invItem.item))
+                {
+                    UpdateUI();
+                    return;
+                }
                 if (pendingHealableSlotIndex == slotIndex)
                     pendingHealableSlotIndex = -1;
                 else
@@ -506,12 +525,12 @@ public class InventoryUI : MonoBehaviour
             }
             else
             {
-                bool used = character.UseConsumable(invItem.item, 1);
+                bool used = character.UseConsumable(invItem.item, 1, slotIndex);
                 if (used)
                 {
-                    PlayConsumableUseSound();
-                    if (invItem.item is ConsumableItem c && c.useTime > 0f)
-                        StartCooldownForSlot(slotIndex, c.useTime);
+                    PlayConsumableUseSound(invItem.item);
+                    if (invItem.item is ConsumableItem cu && cu.useTime > 0f)
+                        StartCooldownForSlot(slotIndex, cu.useTime);
                 }
                 UpdateUI();
             }
@@ -534,8 +553,18 @@ public class InventoryUI : MonoBehaviour
     }
     
     /// <summary>
+    /// True if this item is currently on use delay (medical cooldown). Use to block healing another part until timer is up.
+    /// </summary>
+    public bool IsItemOnCooldown(Item item)
+    {
+        if (item == null) return false;
+        return itemCooldownEndTime.TryGetValue(item, out float endTime) && Time.time < endTime;
+    }
+
+    /// <summary>
     /// Apply the pending healable consumable to the given limb. Returns true if applied and one item was consumed.
     /// Bandage mode stays active so the user can apply to more limbs without re-clicking the item; cleared when the slot is empty or user cancels.
+    /// Cannot apply until delay timer is up.
     /// </summary>
     public bool TryApplyPendingHealableToLimb(ProceduralCharacterController.LimbType limbType)
     {
@@ -548,10 +577,12 @@ public class InventoryUI : MonoBehaviour
             return false;
         }
         Item item = invItem.item;
-        bool success = character.UseConsumableOnLimb(item, limbType, 1);
+        if (IsItemOnCooldown(item))
+            return false;
+        bool success = character.UseConsumableOnLimb(item, limbType, 1, pendingHealableSlotIndex);
         if (success)
         {
-            PlayConsumableUseSound();
+            PlayConsumableUseSound(item);
 
             if (item is ConsumableItem consumable && consumable.useTime > 0f)
                 StartCooldownForSlot(pendingHealableSlotIndex, consumable.useTime);
@@ -573,10 +604,23 @@ public class InventoryUI : MonoBehaviour
         return pendingHealableSlotIndex >= 0 && pendingHealableSlotIndex == slotIndex;
     }
 
-    private void PlayConsumableUseSound()
+    private void PlayConsumableUseSound(Item item = null)
     {
-        if (audioSource != null && consumableUseSound != null)
-            audioSource.PlayOneShot(consumableUseSound, consumableUseVolume);
+        if (audioSource == null) return;
+        AudioClip clip = null;
+        float vol = consumableUseVolume;
+        if (item is ConsumableItem cons && cons.useSound != null)
+        {
+            clip = cons.useSound;
+            vol = cons.useSoundVolume;
+        }
+        else if (consumableUseSound != null)
+            clip = consumableUseSound;
+        // #region agent log
+        try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_playSound\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventoryUI.PlayConsumableUseSound\",\"message\":\"Play consumable sound\",\"data\":{\"audioSourceNotNull\":true,\"clipNotNull\":" + (clip != null ? "true" : "false") + ",\"fromItem\":" + (item is ConsumableItem c && c.useSound != null ? "true" : "false") + "},\"hypothesisId\":\"H4\"}\n"); } catch { }
+        // #endregion
+        if (clip != null)
+            audioSource.PlayOneShot(clip, vol);
     }
 
     private void StartCooldownForSlot(int slotIndex, float duration)
@@ -591,6 +635,9 @@ public class InventoryUI : MonoBehaviour
         Item item = invItem.item;
         itemCooldownEndTime[item] = Time.time + duration;
         itemCooldownDuration[item] = duration;
+        // #region agent log
+        try { System.IO.File.AppendAllText(@"f:\Unity\Shooter\.cursor\debug.log", "{\"id\":\"log_startCD\",\"timestamp\":" + System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"location\":\"InventoryUI.StartCooldownForSlot\",\"message\":\"Cooldown stored\",\"data\":{\"slotIndex\":" + slotIndex + ",\"itemName\":\"" + (item?.name ?? "null") + "\",\"duration\":" + duration + ",\"itemSlotsCount\":" + itemSlots.Count + "},\"hypothesisId\":\"H2\"}\n"); } catch { }
+        // #endregion
         if (slotIndex >= 0 && slotIndex < itemSlots.Count)
         {
             var slot = itemSlots[slotIndex];
