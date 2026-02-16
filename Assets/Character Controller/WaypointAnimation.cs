@@ -62,6 +62,14 @@ public class WaypointAnimation : MonoBehaviour
     [Range(10f, 200f)]
     public float motorTorque = 100f;
     
+    [Tooltip("Motor torque during keyframe animation. Higher values prevent movement from overpowering the animation.")]
+    [Range(50f, 400f)]
+    public float keyframeMotorTorque = 220f;
+    
+    [Tooltip("Motor speed multiplier during keyframe animation. Higher = limbs track the animation more aggressively.")]
+    [Range(3f, 25f)]
+    public float keyframeMotorSpeedMultiplier = 12f;
+    
     [Tooltip("Should limbs return to their initial/neutral positions after animation completes?")]
     public bool returnToNeutralOnComplete = true;
     
@@ -75,6 +83,10 @@ public class WaypointAnimation : MonoBehaviour
     [Range(0.1f, 3f)]
     public float returnToNeutralSmoothing = 1.5f;
     
+    [Tooltip("Seconds to wait after the animation completes before it can be played again. 0 = no cooldown.")]
+    [Range(0f, 10f)]
+    public float cooldownAfterComplete = 0f;
+    
     // Events
     public event Action OnAnimationComplete;
     public event Action<int> OnKeyframeReached; // For callbacks with keyframe index
@@ -83,6 +95,7 @@ public class WaypointAnimation : MonoBehaviour
     // Internal state
     private Coroutine animationCoroutine;
     private bool isPlaying = false;
+    private bool isInCooldown = false;
     private Dictionary<ProceduralLimb, float> initialAngles = new Dictionary<ProceduralLimb, float>();
     private Dictionary<ProceduralLimb, Coroutine> activeAnimations = new Dictionary<ProceduralLimb, Coroutine>();
     private ProceduralCharacterController characterController;
@@ -204,6 +217,11 @@ public class WaypointAnimation : MonoBehaviour
         {
             return; // Animation is already playing, ignore new play request
         }
+        // Block if still in cooldown after last completion
+        if (isInCooldown)
+        {
+            return;
+        }
         
         Stop(); // Stop any existing animation (shouldn't be needed, but safety check)
         
@@ -252,6 +270,7 @@ public class WaypointAnimation : MonoBehaviour
             animationCoroutine = null;
         }
         isPlaying = false;
+        isInCooldown = false;
         initialAngles.Clear();
         
         // Release control so idle animation can take over
@@ -406,6 +425,14 @@ public class WaypointAnimation : MonoBehaviour
             
             // Animation complete
             OnAnimationComplete?.Invoke();
+            
+            // Cooldown: wait before allowing the animation to be played again
+            if (cooldownAfterComplete > 0f)
+            {
+                isInCooldown = true;
+                yield return new WaitForSeconds(cooldownAfterComplete);
+                isInCooldown = false;
+            }
             
         } while (loop && isPlaying);
         
@@ -625,14 +652,14 @@ public class WaypointAnimation : MonoBehaviour
             // Interpolate angle
             float currentAngle = Mathf.LerpAngle(startAngle, targetAngle, t);
             
-            // Set target angle on limb
-            limb.SetTargetAngle(currentAngle);
+            // Use stronger motor during keyframe so animation wins over movement/torso forces
+            limb.SetTargetAngle(currentAngle, keyframeMotorTorque, keyframeMotorSpeedMultiplier);
             
             yield return null;
         }
         
-        // Ensure final angle is set
-        limb.SetTargetAngle(targetAngle);
+        // Ensure final angle is set (same strong motor for last frame)
+        limb.SetTargetAngle(targetAngle, keyframeMotorTorque, keyframeMotorSpeedMultiplier);
         
         // Remove from active animations
         activeAnimations.Remove(limb);

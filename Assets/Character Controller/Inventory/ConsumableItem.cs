@@ -28,8 +28,12 @@ public class ConsumableItem : Item
     [Tooltip("Amount of blood level restored when used (0 = no blood restore). Applied globally; not gated by heavy-bash or laceration severity.")]
     public float bloodRestore = 0f;
 
-    [Tooltip("When true, this consumable is stitches (or similar) and can restore health on heavy stab/slash wounds. When false, bandages only mitigate blood loss on heavy lacerations.")]
+    [Tooltip("When true, can heal tier-2 slash wounds (\"badly slashed\") and stop bleeding on them.")]
     public bool canHealHeavyLacerations = false;
+    [Tooltip("When true, can heal tier-2 stab wounds (\"badly punctured\") and stop bleeding on them.")]
+    public bool canHealHeavyStab = false;
+    [Tooltip("When true, can heal heavily bashed limbs (blunt-only damage below threshold) and stop bleeding on them.")]
+    public bool canHealHeavyBlunt = false;
     
     [Tooltip("Delay in seconds before this item can be used again. On each use, an audio clip plays and a radial fill (on the slot's green dot) fills in sync with this delay to show when it's ready.")]
     public float useTime = 1f;
@@ -48,6 +52,15 @@ public class ConsumableItem : Item
         {
             maxStackSize = 10; // Default stack size for consumables
         }
+
+#if UNITY_EDITOR
+        // Migration: old single canHealHeavyLacerations covered both stab and slash; set canHealHeavyStab for backward compat
+        if (canHealHeavyLacerations && !canHealHeavyStab)
+        {
+            canHealHeavyStab = true;
+            UnityEditor.EditorUtility.SetDirty(this);
+        }
+#endif
     }
     
     /// <summary>
@@ -88,7 +101,7 @@ public class ConsumableItem : Item
             {
                 foreach (var limbType in allLimbTypes)
                 {
-                    if (bleedingController != null && bleedingController.IsLimbHeavilyBashed(limbType))
+                    if (!CanAffectLimbBySeverity(character, bleedingController, limbType))
                         continue;
                     if (stopsBleeding && bleedingController != null)
                     {
@@ -106,7 +119,7 @@ public class ConsumableItem : Item
                 float worstPercent = 1f;
                 foreach (var limbType in allLimbTypes)
                 {
-                    if (!IsLimbEligibleForHeal(character, bleedingController, limbType, canHealHeavyLacerations))
+                    if (!IsLimbEligibleForHeal(character, bleedingController, limbType, canHealHeavyLacerations, canHealHeavyStab, canHealHeavyBlunt))
                         continue;
                     float pct = GetLimbHealthPercent(character, limbType);
                     if (pct < 1f && pct < worstPercent)
@@ -129,10 +142,39 @@ public class ConsumableItem : Item
     }
 
     /// <summary>
+    /// Returns true if healing or stop-bleed can apply to this limb. Gates both healing and StopBleeding by the three severity checkboxes.
+    /// </summary>
+    private bool CanAffectLimbBySeverity(ProceduralCharacterController character, BleedingController bleedingController, ProceduralCharacterController.LimbType limbType)
+    {
+        if (bleedingController != null && bleedingController.IsLimbHeavilyBashed(limbType))
+            return canHealHeavyBlunt;
+
+        var damageTypes = character.GetDamageTypesForLimb(limbType);
+        bool hasStab = damageTypes != null && damageTypes.Contains(Weapon.DamageType.Stab);
+        bool hasSlash = damageTypes != null && damageTypes.Contains(Weapon.DamageType.Slash);
+
+        if (!hasStab && !hasSlash)
+            return true;
+
+        int tier = character.GetLacerationSeverityTierForLimb(limbType);
+        if (tier == 0 || tier == 1)
+            return true;
+
+        if (hasStab && hasSlash)
+            return canHealHeavyStab && canHealHeavyLacerations;
+        if (hasStab)
+            return canHealHeavyStab;
+        return canHealHeavyLacerations;
+    }
+
+    /// <summary>
     /// Applies health restore to one limb respecting laceration severity. Returns true if any heal was applied.
     /// </summary>
     private bool ApplyHealToLimbBySeverity(ProceduralCharacterController character, ProceduralCharacterController.LimbType limbType, BleedingController bleedingController)
     {
+        if (!CanAffectLimbBySeverity(character, bleedingController, limbType))
+            return false;
+
         var damageTypes = character.GetDamageTypesForLimb(limbType);
         bool hasStabOrSlash = damageTypes != null && damageTypes.Any(t => t == Weapon.DamageType.Stab || t == Weapon.DamageType.Slash);
 
@@ -142,7 +184,7 @@ public class ConsumableItem : Item
             int tier = character.GetLacerationSeverityTierForLimb(limbType);
             if (tier == 0) shouldHeal = true;
             else if (tier == 1) shouldHeal = UnityEngine.Random.value < 0.5f;
-            else shouldHeal = canHealHeavyLacerations;
+            else shouldHeal = true;
         }
 
         if (!shouldHeal) return false;
@@ -172,57 +214,41 @@ public class ConsumableItem : Item
             wasUsed = true;
         }
 
-        // Heavily bashed limbs: bandages have no effect (heal/stop-bleed skipped; blood already restored above). Still consume item.
-        if (bleedingController != null && bleedingController.IsLimbHeavilyBashed(limbType))
+        // Heavily bashed limbs: skip heal/stop-bleed unless canHealHeavyBlunt. Blood already restored above. Still consume item.
+        if (bleedingController != null && bleedingController.IsLimbHeavilyBashed(limbType) && !canHealHeavyBlunt)
             return true;
 
-        var damageTypes = character.GetDamageTypesForLimb(limbType);
-        bool hasStabOrSlash = damageTypes != null && damageTypes.Any(t => t == Weapon.DamageType.Stab || t == Weapon.DamageType.Slash);
-
-        if (stopsBleeding && bleedingController != null)
+        if (CanAffectLimbBySeverity(character, bleedingController, limbType) && stopsBleeding && bleedingController != null)
         {
             bleedingController.StopBleeding(limbType);
-        }
-
-        bool shouldHeal = true;
-        if (hasStabOrSlash)
-        {
-            int tier = character.GetLacerationSeverityTierForLimb(limbType);
-            if (tier == 0)
-                shouldHeal = true;
-            else if (tier == 1)
-                shouldHeal = UnityEngine.Random.value < 0.5f;
-            else
-                shouldHeal = canHealHeavyLacerations;
-        }
-
-        if (shouldHeal && healthRestore > 0f)
-        {
-            character.HealLimb(limbType, healthRestore);
             wasUsed = true;
         }
-        if (shouldHeal && limbHealthRestore > 0f)
-        {
-            character.HealLimb(limbType, limbHealthRestore);
-            wasUsed = true;
-        }
-        if (stopsBleeding)
+
+        if (ApplyHealToLimbBySeverity(character, limbType, bleedingController))
             wasUsed = true;
 
         return wasUsed;
     }
 
     private static bool IsLimbEligibleForHeal(ProceduralCharacterController character, BleedingController bleedingController,
-        ProceduralCharacterController.LimbType limbType, bool canHealHeavy)
+        ProceduralCharacterController.LimbType limbType, bool canHealHeavyLacerations, bool canHealHeavyStab, bool canHealHeavyBlunt)
     {
         if (bleedingController != null && bleedingController.IsLimbHeavilyBashed(limbType))
-            return false;
+            return canHealHeavyBlunt;
+
         var damageTypes = character.GetDamageTypesForLimb(limbType);
-        bool hasStabOrSlash = damageTypes != null && damageTypes.Any(t => t == Weapon.DamageType.Stab || t == Weapon.DamageType.Slash);
-        if (!hasStabOrSlash) return true;
+        bool hasStab = damageTypes != null && damageTypes.Contains(Weapon.DamageType.Stab);
+        bool hasSlash = damageTypes != null && damageTypes.Contains(Weapon.DamageType.Slash);
+        if (!hasStab && !hasSlash) return true;
+
         int tier = character.GetLacerationSeverityTierForLimb(limbType);
-        if (tier == 2) return canHealHeavy;
-        return true;
+        if (tier != 2) return true;
+
+        if (hasStab && hasSlash)
+            return canHealHeavyStab && canHealHeavyLacerations;
+        if (hasStab)
+            return canHealHeavyStab;
+        return canHealHeavyLacerations;
     }
 
     private static float GetLimbHealthPercent(ProceduralCharacterController character, ProceduralCharacterController.LimbType limbType)

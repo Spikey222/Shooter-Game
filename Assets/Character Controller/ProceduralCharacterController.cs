@@ -114,6 +114,12 @@ public class ProceduralCharacterController : MonoBehaviour
     /// </summary>
     public bool IsDead { get; private set; }
 
+    /// <summary>
+    /// Fired when damage is actually dealt and hit context is provided. Args: hitPosition, attackDirection (normalized), actualDamage, damageType, limb, isCritical.
+    /// Blood system subscribes to drive directional spray.
+    /// </summary>
+    public event Action<Vector2, Vector2, float, Weapon.DamageType, LimbType, bool, Transform> OnDamageDealt;
+
     [Tooltip("Movement speed of the character")]
     public float moveSpeed = 5f;
     
@@ -231,6 +237,10 @@ public class ProceduralCharacterController : MonoBehaviour
     
     [Tooltip("Minimum movement magnitude to trigger walking animation")]
     public float walkingThreshold = 0.1f;
+    
+    [Tooltip("Scale torso rotation during weapon/attack animation (0 = lock rotation, 1 = full). Reduces joint strain when moving in certain directions.")]
+    [Range(0f, 1f)]
+    public float torsoRotationScaleDuringAttack = 0.4f;
     
     [Header("Hand Settings")]
     [Tooltip("Base angle for right hand relative to forearm")]
@@ -506,9 +516,13 @@ public class ProceduralCharacterController : MonoBehaviour
             {
                 // Zero angular velocity so collisions don't cause runaway spinning
                 torso.angularVelocity = 0f;
+                // During weapon animation, reduce rotation so limbs aren't yanked by torso spin
+                float effectiveRotationSpeed = rotationSpeed;
+                if (equippedItem != null && equippedItem.waypointAnimation != null && equippedItem.waypointAnimation.IsPlaying())
+                    effectiveRotationSpeed *= torsoRotationScaleDuringAttack;
                 // Smoothly rotate towards target angle
                 float currentAngle = torso.rotation;
-                float newAngle = Mathf.LerpAngle(currentAngle, targetAngle, rotationSpeed * Time.fixedDeltaTime);
+                float newAngle = Mathf.LerpAngle(currentAngle, targetAngle, effectiveRotationSpeed * Time.fixedDeltaTime);
                 torso.MoveRotation(newAngle);
             }
         }
@@ -1490,6 +1504,7 @@ public class ProceduralCharacterController : MonoBehaviour
             {
                 limb.OnHealthChanged += (current, max) => UpdateOverallHealth();
             }
+            limb.SetCharacterController(this);
         }
     }
     
@@ -1533,6 +1548,14 @@ public class ProceduralCharacterController : MonoBehaviour
     
     // Apply damage to a specific limb (with optional damage type for armor mitigation and part status)
     public float ApplyDamageToLimb(LimbType limbType, float amount, Weapon.DamageType damageType = Weapon.DamageType.Generic)
+    {
+        return ApplyDamageToLimb(limbType, amount, damageType, null);
+    }
+
+    /// <summary>
+    /// Apply damage with optional hit context (position, direction, critical). When provided and actual damage > 0, fires OnDamageDealt for blood/spray.
+    /// </summary>
+    public float ApplyDamageToLimb(LimbType limbType, float amount, Weapon.DamageType damageType, HitContext? hitContext)
     {
         // Record last damage type for this limb (for body-part UI wording)
         lastDamageTypeByLimb[limbType] = damageType;
@@ -1584,6 +1607,8 @@ public class ProceduralCharacterController : MonoBehaviour
             if (actualDamage > 0f)
             {
                 AddPainToLimb(limbType, actualDamage);
+                if (hitContext.HasValue && hitContext.Value.HasValidDirection)
+                    OnDamageDealt?.Invoke(hitContext.Value.worldPosition, hitContext.Value.attackDirection, actualDamage, damageType, limbType, hitContext.Value.isCritical, hitContext.Value.contactTransform);
                 if (logDamageToConsole)
                     Debug.Log($"[Damage] {gameObject.name} | {limbType}: {actualDamage:F1} (current: {currentHealthAfter:F0}/{maxHealthForPart:F0})");
             }
@@ -1600,7 +1625,11 @@ public class ProceduralCharacterController : MonoBehaviour
                 bluntTraumaByLimb[limbType] += actualDamage;
             }
             if (actualDamage > 0f)
+            {
                 AddPainToLimb(limbType, actualDamage);
+                if (hitContext.HasValue && hitContext.Value.HasValidDirection)
+                    OnDamageDealt?.Invoke(hitContext.Value.worldPosition, hitContext.Value.attackDirection, actualDamage, damageType, limbType, hitContext.Value.isCritical, hitContext.Value.contactTransform);
+            }
             if (logDamageToConsole && actualDamage > 0f)
             {
                 float current = limb.GetCurrentHealth();
@@ -1742,6 +1771,17 @@ public class ProceduralCharacterController : MonoBehaviour
             return limb;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Get the transform to use for attaching blood/stains to a limb (or torso). Used by blood spray to overlay stains on the victim.
+    /// </summary>
+    public Transform GetTransformForLimb(LimbType limbType)
+    {
+        if (limbType == LimbType.Torso && torso != null)
+            return torso.transform;
+        var limb = GetLimb(limbType);
+        return limb != null ? limb.transform : (torso != null ? torso.transform : transform);
     }
     
     /// <summary>

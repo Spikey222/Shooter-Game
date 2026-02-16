@@ -69,11 +69,11 @@ MonoBehaviour:
   torsoContactCalfChance: 1.5
   torsoContactFootChance: 1
   spriteOverrideIndex: -1
-  knifeOverlayPrefab: {fileID: 3554164612597023405, guid: 92199185ba707a347a5e63162a3a73c9, type: 3}
-  knifeSprite: {fileID: 1226911268488096868, guid: 3557191d1afb24447b628a5a52b3dc9c, type: 3}
-  knifeSpriteOffset: {x: -0.21, y: 1}
-  knifeSpriteRotation: -90
-  knifeSortingOrderOffset: -1
+  weaponOverlayPrefab: {fileID: 3554164612597023405, guid: 92199185ba707a347a5e63162a3a73c9, type: 3}
+  weaponSprite: {fileID: 1226911268488096868, guid: 3557191d1afb24447b628a5a52b3dc9c, type: 3}
+  weaponSpriteOffset: {x: -0.21, y: 1}
+  weaponSpriteRotation: -90
+  weaponSortingOrderOffset: -1
   damageKeyframeStartIndex: 1
   damageKeyframeEndIndex: 4
   attackCooldown: 0
@@ -92,7 +92,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WaypointAnimation
   keyframes:
-  - time: 1.18
+  - time: 1
     limbTargets:
     - limbType: 3
       targetLimb: {fileID: 0}
@@ -123,7 +123,7 @@ MonoBehaviour:
         m_RotationOrder: 4
     - limbType: 6
       targetLimb: {fileID: 0}
-      targetAngle: -32
+      targetAngle: 15
       easingCurve:
         serializedVersion: 2
         m_Curve:
@@ -155,11 +155,11 @@ MonoBehaviour:
       m_PostInfinity: 0
       m_RotationOrder: 0
     eventName: 
-  - time: 2.81
+  - time: 2
     limbTargets:
     - limbType: 3
       targetLimb: {fileID: 0}
-      targetAngle: 66.3
+      targetAngle: 30.6
       easingCurve:
         serializedVersion: 2
         m_Curve:
@@ -186,7 +186,124 @@ MonoBehaviour:
         m_RotationOrder: 4
     - limbType: 4
       targetLimb: {fileID: 0}
-      targetAngle: 16.5
+      targetAngle: 30.1
+      easingCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+    - limbType: 5
+      targetLimb: {fileID: 0}
+      targetAngle: 50
+      easingCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+    defaultEasingCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 0
+      m_PostInfinity: 0
+      m_RotationOrder: 0
+    eventName: 
+  - time: 4
+    limbTargets:
+    - limbType: 3
+      targetLimb: {fileID: 0}
+      targetAngle: 31.8
+      easingCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+    - limbType: 4
+      targetLimb: {fileID: 0}
+      targetAngle: 30.1
+      easingCurve:
+        serializedVersion: 2
+        m_Curve:
+        - serializedVersion: 3
+          time: 0
+          value: 0
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        - serializedVersion: 3
+          time: 1
+          value: 1
+          inSlope: 1
+          outSlope: 1
+          tangentMode: 34
+          weightedMode: 0
+          inWeight: 0
+          outWeight: 0
+        m_PreInfinity: 2
+        m_PostInfinity: 2
+        m_RotationOrder: 4
+    - limbType: 5
+      targetLimb: {fileID: 0}
+      targetAngle: 50
       easingCurve:
         serializedVersion: 2
         m_Curve:
@@ -220,9 +337,12 @@ MonoBehaviour:
     eventName: 
   loop: 0
   stopOnInterrupt: 1
-  animationSpeedMultiplier: 1
+  animationSpeedMultiplier: 5
   motorTorque: 200
+  keyframeMotorTorque: 220
+  keyframeMotorSpeedMultiplier: 12
   returnToNeutralOnComplete: 0
   returnToNeutralDelay: 0.1
   returnToNeutralDuration: 15
   returnToNeutralSmoothing: 1.5
+  cooldownAfterComplete: 1.25

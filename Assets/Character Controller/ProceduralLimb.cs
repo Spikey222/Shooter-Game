@@ -23,12 +23,22 @@ public class ProceduralLimb : MonoBehaviour
     [Range(0.1f, 2f)]
     public float damageMultiplier = 1f;
     
+    [Header("Motor Weakness (Damage / Blood Loss)")]
+    [Tooltip("Minimum motor strength at 0% limb health (avoids fully paralyzed limb). 1 = no scaling.")]
+    [Range(0f, 1f)]
+    public float minMotorStrengthAtZeroHealth = 0.2f;
+    [Tooltip("Minimum motor strength at 0% blood level (avoids full paralysis before death). 1 = no scaling.")]
+    [Range(0f, 1f)]
+    public float minMotorStrengthAtZeroBlood = 0.25f;
+    
     // Event for when limb health changes
     public event Action<float, float> OnHealthChanged; // current, max
     
     // Components
     private Rigidbody2D rb;
     private HingeJoint2D joint;
+    // Optional: set by ProceduralCharacterController in InitializeLimbMap for blood-level scaling
+    private ProceduralCharacterController characterController;
     
     // Track previous health value to detect inspector changes at runtime
     private float previousHealth = -1f;
@@ -93,9 +103,44 @@ public class ProceduralLimb : MonoBehaviour
         }
     }
     
+    /// <summary>Set by ProceduralCharacterController when limb is registered. Used for blood-level motor scaling.</summary>
+    public void SetCharacterController(ProceduralCharacterController controller)
+    {
+        characterController = controller;
+    }
+    
+    /// <summary>Default motor torque when not overridden (idle/walk).</summary>
+    public const float DefaultMotorTorque = 100f;
+    /// <summary>Default motor speed multiplier when not overridden.</summary>
+    public const float DefaultMotorSpeedMultiplier = 5f;
+
+    /// <summary>Combined scale for motor strength from limb health and character blood (0-1). Used by SetExactAngle and SmoothRotateToZero.</summary>
+    private float GetMotorStrengthScale()
+    {
+        float damageFactor = Mathf.Lerp(minMotorStrengthAtZeroHealth, 1f, GetHealthPercentage());
+        float bloodFactor = 1f;
+        if (characterController != null)
+        {
+            BleedingController bc = characterController.GetComponent<BleedingController>();
+            if (bc != null)
+                bloodFactor = Mathf.Lerp(minMotorStrengthAtZeroBlood, 1f, bc.GetBloodLevelPercent());
+        }
+        return Mathf.Max(0.01f, damageFactor * bloodFactor);
+    }
+
     // Method to set a new target angle (used for animation or control)
     // Respects the joint's configured angle limits - does not modify them.
     public void SetTargetAngle(float newAngle)
+    {
+        SetTargetAngle(newAngle, DefaultMotorTorque, DefaultMotorSpeedMultiplier);
+    }
+
+    /// <summary>
+    /// Set target angle with explicit motor strength. Use higher torque/speed when animations
+    /// must win over movement (e.g. attacks) so joints don't get overpowered by torso motion.
+    /// Motor strength and speed are scaled by limb health and character blood level (weaker when damaged or low blood).
+    /// </summary>
+    public void SetTargetAngle(float newAngle, float maxMotorTorque, float motorSpeedMultiplier)
     {
         if (joint != null)
         {
@@ -106,22 +151,26 @@ public class ProceduralLimb : MonoBehaviour
                 clampedTarget = Mathf.Clamp(newAngle, joint.limits.min, joint.limits.max);
             }
             
+            float scale = GetMotorStrengthScale();
+            float effectiveTorque = Mathf.Max(1f, maxMotorTorque * scale);
+            float effectiveSpeedMultiplier = Mathf.Max(0.5f, motorSpeedMultiplier * scale);
+            
             // Enable motor to move toward the target angle (limits constrain movement)
             joint.useMotor = true;
             JointMotor2D motor = joint.motor;
-            motor.maxMotorTorque = 100f; // Increased for more punchy movement
+            motor.maxMotorTorque = effectiveTorque;
             
             // Calculate current angle and set motor direction
             float currentAngle = joint.jointAngle;
             float angleDifference = Mathf.DeltaAngle(currentAngle, clampedTarget);
-            motor.motorSpeed = angleDifference * 5f; // Adjust multiplier as needed
+            motor.motorSpeed = angleDifference * effectiveSpeedMultiplier;
             
             joint.motor = motor;
         }
     }
     
     // Method to set an exact angle (for spectator mode head positioning)
-    // Respects the joint's configured angle limits - does not modify them.
+    // Respects the joint's configured angle limits - does not modify them. Motor strength scaled by damage/blood.
     public void SetExactAngle(float exactAngle)
     {
         if (joint != null)
@@ -133,16 +182,13 @@ public class ProceduralLimb : MonoBehaviour
                 clampedTarget = Mathf.Clamp(exactAngle, joint.limits.min, joint.limits.max);
             }
             
-            // Enable motor with higher torque for precise control
+            float scale = GetMotorStrengthScale();
             joint.useMotor = true;
             JointMotor2D motor = joint.motor;
-            motor.maxMotorTorque = 200f; // Higher torque for precise positioning
-            
-            // Calculate current angle and set motor direction
+            motor.maxMotorTorque = Mathf.Max(1f, 200f * scale);
             float currentAngle = joint.jointAngle;
             float angleDifference = Mathf.DeltaAngle(currentAngle, clampedTarget);
-            motor.motorSpeed = angleDifference * 10f; // Higher multiplier for faster correction
-            
+            motor.motorSpeed = angleDifference * Mathf.Max(0.5f, 10f * scale);
             joint.motor = motor;
         }
     }
@@ -204,15 +250,15 @@ public class ProceduralLimb : MonoBehaviour
                     rb.angularVelocity = velocityReduction;
                 }
                 
-                // Motor drives toward interpolated target (limits constrain movement)
+                // Motor drives toward interpolated target (limits constrain movement); scale by damage/blood
+                float scale = GetMotorStrengthScale();
                 joint.useMotor = true;
                 JointMotor2D motor = joint.motor;
-                motor.maxMotorTorque = Mathf.Lerp(30f, 80f, t);
-                
+                motor.maxMotorTorque = Mathf.Max(1f, Mathf.Lerp(30f, 80f, t) * scale);
                 float currentAngle = joint.jointAngle;
                 float angleDifference = Mathf.DeltaAngle(currentAngle, currentTarget);
-                float speedMultiplier = Mathf.Lerp(8f, 3f, t);
-                motor.motorSpeed = angleDifference * speedMultiplier;
+                float speedMultiplier = Mathf.Lerp(8f, 3f, t) * scale;
+                motor.motorSpeed = angleDifference * Mathf.Max(0.5f, speedMultiplier);
                 joint.motor = motor;
                 
                 elapsedTime += Time.deltaTime;
@@ -225,12 +271,12 @@ public class ProceduralLimb : MonoBehaviour
             
             while (finalElapsedTime < finalDuration)
             {
+                float scale = GetMotorStrengthScale();
                 joint.useMotor = true;
                 JointMotor2D motor = joint.motor;
-                motor.maxMotorTorque = 30f;
-                
+                motor.maxMotorTorque = Mathf.Max(1f, 30f * scale);
                 float currentAngle = joint.jointAngle;
-                motor.motorSpeed = Mathf.DeltaAngle(currentAngle, targetAngle) * 2f;
+                motor.motorSpeed = Mathf.DeltaAngle(currentAngle, targetAngle) * Mathf.Max(0.5f, 2f * scale);
                 joint.motor = motor;
                 
                 if (rb != null)
@@ -242,9 +288,10 @@ public class ProceduralLimb : MonoBehaviour
                 yield return null;
             }
             
-            // Final stabilization - maintain position with minimal force
+            // Final stabilization - maintain position with minimal force (scaled by damage/blood)
+            float finalScale = GetMotorStrengthScale();
             JointMotor2D finalMotor = joint.motor;
-            finalMotor.maxMotorTorque = 10f;
+            finalMotor.maxMotorTorque = Mathf.Max(1f, 10f * finalScale);
             finalMotor.motorSpeed = 0f;
             joint.motor = finalMotor;
         }

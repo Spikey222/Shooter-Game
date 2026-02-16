@@ -42,7 +42,7 @@ public class BleedingController : MonoBehaviour
     public float heavyBashBleedThreshold = 0.3f;
 
     [Header("Blood Visual")]
-    [Tooltip("If set, this prefab is instantiated for each spawn; otherwise use Blood Sprite Variants")]
+    [Tooltip("If set, this prefab is instantiated for each spawn; otherwise use Blood Sprite Variants.")]
     public GameObject bloodPrefab;
 
     [Tooltip("Different blood sprites (drops, splats, pools). One random variant per spawn when not using prefab.")]
@@ -60,16 +60,6 @@ public class BleedingController : MonoBehaviour
 
     [Tooltip("Min/max scale for spawned blood (random in range)")]
     public Vector2 bloodScaleRange = new Vector2(0.8f, 1.2f);
-
-    [Header("Blood Pooling")]
-    [Tooltip("If true, new blood within this radius of an existing pool merges into it (dominant sprite scales up).")]
-    public bool mergeBloodPools = true;
-    [Tooltip("Base distance within which a new drop will merge into an existing blood pool. Actual radius scales up with pool size.")]
-    [Range(0.05f, 1f)]
-    public float bloodMergeRadius = 0.25f;
-    [Tooltip("Maximum size blood pools can grow to when merging.")]
-    [Range(1f, 25f)]
-    public float bloodPoolMaxScale = 10f;
 
     [Header("Sorting")]
     [Tooltip("Sorting layer name for blood when not using character reference (e.g. Default or Ground)")]
@@ -422,16 +412,6 @@ public class BleedingController : MonoBehaviour
         float scaleToAdd = UnityEngine.Random.Range(bloodScaleRange.x, bloodScaleRange.y);
         Vector3 worldPos = new Vector3(worldPosition.x, worldPosition.y, 0f);
 
-        if (mergeBloodPools && bloodMergeRadius > 0f)
-        {
-            BloodPool existing = BloodPool.FindNearestPool(worldPosition, bloodMergeRadius);
-            if (existing != null)
-            {
-                existing.AddBlood(scaleToAdd);
-                return;
-            }
-        }
-
         if (bloodPrefab != null)
         {
             Quaternion rot = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
@@ -439,8 +419,6 @@ public class BleedingController : MonoBehaviour
             go.transform.position = worldPos;
             go.transform.rotation = rot;
             go.transform.localScale = new Vector3(scaleToAdd, scaleToAdd, 1f);
-
-            EnsureBloodPoolComponent(go);
             ApplyBloodSorting(go);
             return;
         }
@@ -460,18 +438,7 @@ public class BleedingController : MonoBehaviour
 
         SpriteRenderer renderer = bloodGo.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
-        EnsureBloodPoolComponent(bloodGo);
         ApplyBloodSorting(bloodGo);
-    }
-
-    private void EnsureBloodPoolComponent(GameObject bloodObject)
-    {
-        BloodPool pool = bloodObject.GetComponent<BloodPool>();
-        if (pool == null)
-            pool = bloodObject.AddComponent<BloodPool>();
-
-        // Let the controller define how big pools are allowed to get.
-        pool.maxScale = bloodPoolMaxScale;
     }
 
     private void ApplyBloodSorting(GameObject bloodObject)

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 using System.Linq;
 using System.IO;
 
@@ -41,19 +42,24 @@ public class WeaponOneHanded : Weapon
 
     [Header("Weapon Overlay")]
     [Tooltip("GameObject prefab for the weapon overlay (can include collision boxes, sprites, etc.). If set, this takes priority over weaponSprite.")]
-    public GameObject knifeOverlayPrefab;
+    [FormerlySerializedAs("knifeOverlayPrefab")]
+    public GameObject weaponOverlayPrefab;
 
-    [Tooltip("Sprite for the weapon to overlay under the right hand (used only if knifeOverlayPrefab is not set)")]
-    public Sprite knifeSprite;
+    [Tooltip("Sprite for the weapon to overlay under the right hand (used only if weaponOverlayPrefab is not set)")]
+    [FormerlySerializedAs("knifeSprite")]
+    public Sprite weaponSprite;
 
     [Tooltip("Local offset for weapon overlay relative to hand (X, Y)")]
-    public Vector2 knifeSpriteOffset = Vector2.zero;
+    [FormerlySerializedAs("knifeSpriteOffset")]
+    public Vector2 weaponSpriteOffset = Vector2.zero;
 
     [Tooltip("Local rotation for weapon overlay (Z rotation in degrees)")]
-    public float knifeSpriteRotation = 0f;
+    [FormerlySerializedAs("knifeSpriteRotation")]
+    public float weaponSpriteRotation = 0f;
 
-    [Tooltip("Sorting order offset for weapon overlay (negative = below hand, positive = above hand). Only applies if using knifeSprite.")]
-    public int knifeSortingOrderOffset = -1;
+    [Tooltip("Sorting order offset for weapon overlay (negative = below hand, positive = above hand). Only applies if using weaponSprite.")]
+    [FormerlySerializedAs("knifeSortingOrderOffset")]
+    public int weaponSortingOrderOffset = -1;
 
     [Header("Animation Settings")]
     [Tooltip("Keyframe index where damage window starts (0-based)")]
@@ -298,7 +304,7 @@ public class WeaponOneHanded : Weapon
                 continue;
             hitTargetsThisAttack.Add(target);
             hitAnyTarget = true;
-            TakeKnifeDamageToTarget(target, contactCollider);
+            TakeKnifeDamageToTarget(target, contactCollider, checkCenter);
         }
 
         if (hitAnyTarget && stabSound != null && audioSource != null)
@@ -307,20 +313,26 @@ public class WeaponOneHanded : Weapon
 
     /// <summary>
     /// Apply damage to a target based on contact. Damages the contacted part directly, unless contact is torso—then uses weighted random (Head/Neck/Torso high bias, Thighs/Calves/Feet low bias).
+    /// Builds HitContext for blood spray: hit position and attack direction from attacker hand to contact point.
     /// </summary>
-    private void TakeKnifeDamageToTarget(ProceduralCharacterController target, Collider2D contactCollider)
+    private void TakeKnifeDamageToTarget(ProceduralCharacterController target, Collider2D contactCollider, Vector2 checkCenter)
     {
         if (target == null) return;
 
         float damage = baseDamage * damageMultiplier;
+        Vector2 hitPosition = contactCollider.ClosestPoint(checkCenter);
+        Vector2 attackDir = (hitPosition - checkCenter).normalized;
+        if (attackDir.sqrMagnitude < 0.01f)
+            attackDir = Vector2.right; // fallback
+
         var contactLimbType = target.GetLimbTypeForCollider(contactCollider);
+        ProceduralCharacterController.LimbType limbToDamage;
         if (contactLimbType == null)
         {
-            target.ApplyDamageToLimb(ProceduralCharacterController.LimbType.Torso, damage, damageType);
+            target.ApplyDamageToLimb(ProceduralCharacterController.LimbType.Torso, damage, damageType, new HitContext { worldPosition = hitPosition, attackDirection = attackDir, isCritical = false, contactTransform = contactCollider.transform });
             return;
         }
 
-        ProceduralCharacterController.LimbType limbToDamage;
         if (contactLimbType == ProceduralCharacterController.LimbType.Torso)
         {
             limbToDamage = target.SelectKnifeTorsoContactLimb(
@@ -333,7 +345,9 @@ public class WeaponOneHanded : Weapon
             limbToDamage = contactLimbType.Value;
         }
 
-        target.ApplyDamageToLimb(limbToDamage, damage, damageType);
+        bool isCritical = limbToDamage == ProceduralCharacterController.LimbType.Head || limbToDamage == ProceduralCharacterController.LimbType.Neck;
+        var hitContext = new HitContext { worldPosition = hitPosition, attackDirection = attackDir, isCritical = isCritical, contactTransform = contactCollider.transform };
+        target.ApplyDamageToLimb(limbToDamage, damage, damageType, hitContext);
     }
 
     /// <summary>
@@ -432,7 +446,7 @@ public class WeaponOneHanded : Weapon
     private void CreateKnifeOverlays(ProceduralCharacterController controller)
     {
         // Check if we have either a prefab or sprite
-        if (knifeOverlayPrefab == null && knifeSprite == null)
+        if (weaponOverlayPrefab == null && weaponSprite == null)
         {
             Debug.LogWarning($"[WeaponOneHanded] No weapon overlay prefab or sprite assigned. Overlay will not be created.", this);
             return;
@@ -446,12 +460,12 @@ public class WeaponOneHanded : Weapon
         // So we attach to leftHand to match the visual appearance
         if (controller.leftHand != null)
         {
-            if (knifeOverlayPrefab != null)
+            if (weaponOverlayPrefab != null)
             {
                 // Use GameObject prefab (supports collision boxes, multiple components, etc.)
                 rightHandKnifeOverlay = CreateKnifeOverlayFromPrefab(
                     controller.leftHand.transform,
-                    "RightHandKnifeOverlay"
+                    "RightHandWeaponOverlay"
                 );
             }
             else
@@ -463,7 +477,7 @@ public class WeaponOneHanded : Weapon
                     rightHandKnifeOverlay = CreateKnifeOverlayObject(
                         controller.leftHand.transform,
                         handRenderer,
-                        "RightHandKnifeOverlay"
+                        "RightHandWeaponOverlay"
                     );
                 }
             }
@@ -496,18 +510,18 @@ public class WeaponOneHanded : Weapon
     /// </summary>
     private GameObject CreateKnifeOverlayFromPrefab(Transform handParent, string overlayName)
     {
-        if (knifeOverlayPrefab == null)
+        if (weaponOverlayPrefab == null)
             return null;
 
         // Instantiate the prefab
-        GameObject overlayGO = Instantiate(knifeOverlayPrefab, handParent);
+        GameObject overlayGO = Instantiate(weaponOverlayPrefab, handParent);
         overlayGO.name = overlayName;
 
         // Apply position offset
-        overlayGO.transform.localPosition = new Vector3(knifeSpriteOffset.x, knifeSpriteOffset.y, 0f);
+        overlayGO.transform.localPosition = new Vector3(weaponSpriteOffset.x, weaponSpriteOffset.y, 0f);
 
         // Apply rotation
-        overlayGO.transform.localRotation = Quaternion.Euler(0f, 0f, knifeSpriteRotation);
+        overlayGO.transform.localRotation = Quaternion.Euler(0f, 0f, weaponSpriteRotation);
 
         // Ensure scale is correct (preserve prefab scale)
         // Local scale is already set by Instantiate, but we can override if needed
@@ -519,7 +533,7 @@ public class WeaponOneHanded : Weapon
         if (overlayRenderer != null && handRenderer != null)
         {
             overlayRenderer.sortingLayerID = handRenderer.sortingLayerID;
-            overlayRenderer.sortingOrder = handRenderer.sortingOrder + knifeSortingOrderOffset;
+            overlayRenderer.sortingOrder = handRenderer.sortingOrder + weaponSortingOrderOffset;
         }
 
         return overlayGO;
@@ -532,22 +546,22 @@ public class WeaponOneHanded : Weapon
     {
         GameObject overlayGO = new GameObject(overlayName);
         overlayGO.transform.SetParent(handParent, false);
-        overlayGO.transform.localPosition = new Vector3(knifeSpriteOffset.x, knifeSpriteOffset.y, 0f);
-        overlayGO.transform.localRotation = Quaternion.Euler(0f, 0f, knifeSpriteRotation);
+        overlayGO.transform.localPosition = new Vector3(weaponSpriteOffset.x, weaponSpriteOffset.y, 0f);
+        overlayGO.transform.localRotation = Quaternion.Euler(0f, 0f, weaponSpriteRotation);
         overlayGO.transform.localScale = Vector3.one;
 
         SpriteRenderer sr = overlayGO.AddComponent<SpriteRenderer>();
-        sr.sprite = knifeSprite;
+        sr.sprite = weaponSprite;
 
         // Match sorting layer and set sorting order below the hand
         if (handRenderer != null)
         {
             sr.sortingLayerID = handRenderer.sortingLayerID;
-            sr.sortingOrder = handRenderer.sortingOrder + knifeSortingOrderOffset;
+            sr.sortingOrder = handRenderer.sortingOrder + weaponSortingOrderOffset;
         }
         else
         {
-            sr.sortingOrder = knifeSortingOrderOffset;
+            sr.sortingOrder = weaponSortingOrderOffset;
         }
 
         return overlayGO;
