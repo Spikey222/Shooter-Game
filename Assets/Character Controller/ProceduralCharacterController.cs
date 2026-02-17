@@ -120,6 +120,12 @@ public class ProceduralCharacterController : MonoBehaviour
     /// </summary>
     public event Action<Vector2, Vector2, float, Weapon.DamageType, LimbType, bool, Transform> OnDamageDealt;
 
+    /// <summary>
+    /// Static event fired when ANY character takes damage. Args: victim, hitPosition, attackDirection, actualDamage, damageType, limb, isCritical.
+    /// Use for a single global BloodSprayManager instead of per-character controllers.
+    /// </summary>
+    public static event Action<ProceduralCharacterController, Vector2, Vector2, float, Weapon.DamageType, LimbType, bool> OnAnyDamageDealt;
+
     [Tooltip("Movement speed of the character")]
     public float moveSpeed = 5f;
     
@@ -1605,13 +1611,15 @@ public class ProceduralCharacterController : MonoBehaviour
             UpdateOverallHealth();
             
             if (actualDamage > 0f)
-            {
                 AddPainToLimb(limbType, actualDamage);
-                if (hitContext.HasValue && hitContext.Value.HasValidDirection)
-                    OnDamageDealt?.Invoke(hitContext.Value.worldPosition, hitContext.Value.attackDirection, actualDamage, damageType, limbType, hitContext.Value.isCritical, hitContext.Value.contactTransform);
-                if (logDamageToConsole)
-                    Debug.Log($"[Damage] {gameObject.name} | {limbType}: {actualDamage:F1} (current: {currentHealthAfter:F0}/{maxHealthForPart:F0})");
+            float damageForEvent = actualDamage > 0f ? actualDamage : amount;
+            if (hitContext.HasValue && hitContext.Value.HasValidDirection && (actualDamage > 0f || amount > 0f))
+            {
+                OnDamageDealt?.Invoke(hitContext.Value.worldPosition, hitContext.Value.attackDirection, damageForEvent, damageType, limbType, hitContext.Value.isCritical, hitContext.Value.contactTransform);
+                OnAnyDamageDealt?.Invoke(this, hitContext.Value.worldPosition, hitContext.Value.attackDirection, damageForEvent, damageType, limbType, hitContext.Value.isCritical);
             }
+            if (logDamageToConsole && actualDamage > 0f)
+                Debug.Log($"[Damage] {gameObject.name} | {limbType}: {actualDamage:F1} (current: {currentHealthAfter:F0}/{maxHealthForPart:F0})");
             return actualDamage;
         }
         
@@ -1625,10 +1633,12 @@ public class ProceduralCharacterController : MonoBehaviour
                 bluntTraumaByLimb[limbType] += actualDamage;
             }
             if (actualDamage > 0f)
-            {
                 AddPainToLimb(limbType, actualDamage);
-                if (hitContext.HasValue && hitContext.Value.HasValidDirection)
-                    OnDamageDealt?.Invoke(hitContext.Value.worldPosition, hitContext.Value.attackDirection, actualDamage, damageType, limbType, hitContext.Value.isCritical, hitContext.Value.contactTransform);
+            float damageForEvent = actualDamage > 0f ? actualDamage : amount;
+            if (hitContext.HasValue && hitContext.Value.HasValidDirection && (actualDamage > 0f || amount > 0f))
+            {
+                OnDamageDealt?.Invoke(hitContext.Value.worldPosition, hitContext.Value.attackDirection, damageForEvent, damageType, limbType, hitContext.Value.isCritical, hitContext.Value.contactTransform);
+                OnAnyDamageDealt?.Invoke(this, hitContext.Value.worldPosition, hitContext.Value.attackDirection, damageForEvent, damageType, limbType, hitContext.Value.isCritical);
             }
             if (logDamageToConsole && actualDamage > 0f)
             {
@@ -1906,11 +1916,11 @@ public class ProceduralCharacterController : MonoBehaviour
     // Get health percentage for a specific limb
     public float GetLimbHealthPercentage(LimbType limbType)
     {
+        if (limbType == LimbType.Torso)
+            return GetTorsoMaxHealth() > 0f ? GetTorsoHealth() / GetTorsoMaxHealth() : 1f;
         if (limbMap.TryGetValue(limbType, out ProceduralLimb limb))
-        {
             return limb.GetHealthPercentage();
-        }
-        return 1f; // Default to full health if limb not found
+        return 1f;
     }
     
     // Select a random limb based on weighted hit probabilities

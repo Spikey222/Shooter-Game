@@ -87,6 +87,20 @@ public class BleedingController : MonoBehaviour
     [Tooltip("Parent transform for spawned blood (keeps hierarchy clean). Leave empty for scene root.")]
     public Transform bloodParent;
 
+    [Header("Debug")]
+    [Tooltip("Log passive blood spawns to Console")]
+    public bool enableDebugLogs;
+
+    [Header("Fake Fall Animation")]
+    [Tooltip("If true, blood drops animate from spawn position down to floor instead of popping in place.")]
+    public bool useFakeFallAnimation = true;
+    [Tooltip("Time for blood to 'fall' to floor (seconds)")]
+    [Range(0.15f, 0.8f)]
+    public float fallDuration = 0.35f;
+    [Tooltip("Y offset below spawn for floor target")]
+    [Range(-0.5f, 0f)]
+    public float floorOffset = -0.25f;
+
     [Header("Bleed Status (for UI)")]
     [Tooltip("Intensity above this = Light bleeding (for body part info display)")]
     [Range(0f, 2f)]
@@ -248,6 +262,8 @@ public class BleedingController : MonoBehaviour
             {
                 bleedAccumulators[limbType] -= bleedSpawnThreshold;
                 Vector2 worldPos = GetSpawnPositionFor(limbType);
+                if (enableDebugLogs)
+                    Debug.Log($"[Bleeding] SpawnBlood | {gameObject.name} limb={limbType} pos={worldPos} intensity={intensity:F2}");
                 SpawnBlood(worldPos, limbType);
             }
         }
@@ -420,6 +436,12 @@ public class BleedingController : MonoBehaviour
             go.transform.rotation = rot;
             go.transform.localScale = new Vector3(scaleToAdd, scaleToAdd, 1f);
             ApplyBloodSorting(go);
+            if (useFakeFallAnimation)
+            {
+                AddFakeFallToBlood(go, worldPosition);
+                if (enableDebugLogs)
+                    Debug.Log($"[Bleeding] Added BloodDropFallAnimator to prefab blood at {worldPosition}");
+            }
             return;
         }
 
@@ -439,6 +461,24 @@ public class BleedingController : MonoBehaviour
         SpriteRenderer renderer = bloodGo.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
         ApplyBloodSorting(bloodGo);
+
+        if (useFakeFallAnimation)
+        {
+            AddFakeFallToBlood(bloodGo, worldPosition);
+            if (enableDebugLogs)
+                Debug.Log($"[Bleeding] Added BloodDropFallAnimator to passive blood at {worldPosition}");
+        }
+    }
+
+    private void AddFakeFallToBlood(GameObject bloodGo, Vector2 startPos)
+    {
+        var anim = bloodGo.AddComponent<BloodDropFallAnimator>();
+        anim.fallDuration = fallDuration;
+        anim.floorOffset = floorOffset;
+        anim.scaleMode = BloodDropFallAnimator.ScaleMode.SplatOnLand;
+        anim.splatDuration = 0.08f;
+        Vector2 targetPos = startPos + new Vector2(0f, floorOffset);
+        anim.Begin(startPos, targetPos);
     }
 
     private void ApplyBloodSorting(GameObject bloodObject)

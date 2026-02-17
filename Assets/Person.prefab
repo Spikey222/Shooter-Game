@@ -828,6 +828,10 @@ MonoBehaviour:
   bleedDamagePerSecond: 2
   bleedDoTInterval: 0.5
   bloodParent: {fileID: 0}
+  enableDebugLogs: 0
+  useFakeFallAnimation: 1
+  fallDuration: 0.35
+  floorOffset: -0.25
 --- !u!1 &2119120414136206139
 GameObject:
   m_ObjectHideFlags: 0
